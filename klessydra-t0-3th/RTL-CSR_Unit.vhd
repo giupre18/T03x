@@ -29,6 +29,7 @@ use work.riscv_klessydra.all;
 
 entity CSR_Unit is
   generic (
+    PMP_REGIONS             : natural := 64; -- Numero di regioni PMP supportate
     THREAD_POOL_SIZE_GLOBAL : natural;
     THREAD_POOL_SIZE        : natural;
     MCYCLE_EN               : natural;
@@ -86,13 +87,15 @@ entity CSR_Unit is
     irq_id_o                    : out std_logic_vector(4 downto 0);
     irq_ack_o                   : out std_logic;
     sw_irq                      : in  std_logic_vector(THREAD_POOL_SIZE_GLOBAL-1 downto 0);
-    sw_irq_pending              : in  std_logic_vector(THREAD_POOL_SIZE_GLOBAL-1 downto 0)
+    sw_irq_pending              : in  std_logic_vector(THREAD_POOL_SIZE_GLOBAL-1 downto 0);
+    pmpaddr                     : out pmpaddr_array ;  ---------------------------------------------------------------------aggiungo io
+    pmpcfg                      : out pmpcfg_array   ---------------------------------------------------------------------aggiungo io
     );
 end entity;
 
 
 architecture CSR of CSR_Unit is
-
+  
   subtype harc_range is natural range THREAD_POOL_SIZE-1 downto 0;
 
   signal pc_IE_replicated : harc_vec_array;	
@@ -172,7 +175,40 @@ architecture CSR of CSR_Unit is
     return to_integer(unsigned(instr(7+(RF_CEIL-1) downto 7)));
   end;
 
+
+  function extract_pmpcfg_in_field(
+        pmpcfg_in : pmpcfg_array; 
+        segment_index : integer
+    ) return std_logic_vector is
+        variable reg_index   : integer;  -- Indice del registro
+        variable field_index : integer;  -- Indice del campo all'interno del registro
+        variable pmpcfg_in_reg  : std_logic_vector(31 downto 0); -- Registro corrente
+        variable extracted_field : std_logic_vector(7 downto 0); -- Campo estratto
+    begin
+        -- Calcola quale registro contiene il segmento richiesto
+        reg_index := segment_index / 4;
+        -- Calcola quale segmento del registro Ã¨ richiesto
+        field_index := segment_index mod 4;
+
+        -- Estrai il registro corrispondente
+        pmpcfg_in_reg := pmpcfg_in(reg_index);
+
+        -- Estrai il campo specifico (8 bit) dal registro
+        case field_index is
+            when 0 => extracted_field := pmpcfg_in_reg(7 downto 0);
+            when 1 => extracted_field := pmpcfg_in_reg(15 downto 8);
+            when 2 => extracted_field := pmpcfg_in_reg(23 downto 16);
+            when 3 => extracted_field := pmpcfg_in_reg(31 downto 24);
+            when others =>
+                extracted_field := (others => '0'); -- Caso di errore, valore di default
+        end case;
+
+        return extracted_field;
+  end function;
+
+
 begin
+
 
   -- Connecting internal signal to ports (VHDL1993)
   PCER <= PCER_int;
@@ -207,8 +243,13 @@ begin
     trap_hndlr(h)               <= '1' when pc_IE_replicated(h) = MTVEC_RESET_VALUE  else '0';
 
     CSR_unit_op : process(clk_i, rst_ni)  -- single cycle unit, one process, fully synchronous 
-    begin
 
+    variable pmpcfg_in_field : std_logic_vector(7 downto 0) ;
+    variable pmpcfg_internal : pmpcfg_array;
+    variable pmpaddr_internal : pmpaddr_array;---------------------------------------------------------------------aggiungo io
+
+    begin
+     
       if rst_ni = '0' then
         --
         MSTATUS_internal(h)                 <= "01";
@@ -252,7 +293,20 @@ begin
         csr_access_denied_o_replicated(h)   <= '0';
         csr_rdata_o_replicated(h)           <= (others => '0');
 
+        pmpaddr_internal(0)       := x"00040000";
+        pmpaddr_internal(1)       := x"00040800";
+        pmpaddr_internal(2)       := x"20000000";
+        pmpaddr_internal(3)       := x"23FFFFFF";
+        pmpaddr_internal(4 to pmpaddr_internal'length-1) := (others => (others => '0'));
+
+        pmpcfg_internal(0)        := x"8F8F8E8F";
+        pmpcfg_internal(1)        := x"00000808";
+        pmpcfg_internal(2 to pmpcfg_internal'length-1) := (others => (others => '0'));
+   
       elsif rising_edge(clk_i) then
+        pmpcfg <= pmpcfg_internal; ---------------------------------------------------------------------aggiungo io
+        pmpaddr <= pmpaddr_internal; ---------------------------------------------------------------------aggiungo io
+
         MHARTID_int(h) <= std_logic_vector(resize(unsigned(core_id_i) * (THREAD_POOL_SIZE_GLOBAL- THREAD_POOL_SIZE)  + to_unsigned(h, THREAD_ID_SIZE), 10));
         -- CSR updating for all possible sources follows.
         --       ext. int., sw int., timer int., exceptions.
@@ -381,8 +435,52 @@ begin
           -----------------------------------------------------------------------------
 
           if (csr_op_i /= "000" and csr_op_i /= "100") then  -- check for valid operation 
-            case csr_addr_i is
+            
+             
+             --- pmp implementation
+       for i in pmpaddrconst'range loop
+        if csr_addr_i = pmpaddrconst(i) then
+           pmpcfg_in_field  := extract_pmpcfg_in_field(pmpcfg_internal, i );
+           if pmpcfg_in_field(7) = '0' then
+              case csr_op_i is
+                   when CSRRW | CSRRWI =>
+                        pmpaddr_internal(i) := csr_wdata_i(31 downto 0);
+                    when CSRRS | CSRRSI =>
+                         if rs1(instr_word_IE) /= 0 then
+                            pmpaddr(i) <= pmpaddr_internal(i);
+                         end if;
+                    when others =>
+                         null;
+                    end case; 
+              exit; -- Una volta trovato, usciamo dal loop
+           end if;
+        end if;
+       end loop;
+  
+       for i in pmpcfgconstant'range loop
+        if csr_addr_i = pmpcfgconstant(i) then
+           case csr_op_i is
+                when CSRRW | CSRRWI =>
+        -- Ciclo per verificare e aggiornare ogni segmento di 8 bit
+                     for j in 0 to 3 loop
+                        if pmpcfg_internal(i)((j+1)*8 - 1) = '0' then
+                           pmpcfg_internal(i)(j*8+7 downto j*8) := csr_wdata_i(j*8+7 downto j*8);
+                        end if;
+                      end loop;
+                when CSRRS | CSRRSI =>
+                        if rs1(instr_word_IE) /= 0 then
+                           pmpcfg(i) <= pmpcfg_internal(i);
+                        end if;
+                when others =>
+                     null;
+                end case;
+           exit; -- Esce dal loop se è stata trovata una corrispondenza
+        end if; 
+       end loop;
 
+
+
+       case csr_addr_i is    
               when MSTATUS_addr =>
                 case csr_op_i is
                   when CSRRW|CSRRWI =>
@@ -1158,7 +1256,6 @@ begin
               end if;
             end if;
           end if;
-
         --end if;  --debug_req_o='0'
       end if;  -- reset or clk'event
     end process;

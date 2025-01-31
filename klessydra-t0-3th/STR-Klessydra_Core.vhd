@@ -60,7 +60,9 @@ entity klessydra_t0_3th_core is
     N_EXT_PERF_COUNTERS     : integer := 0;   -- ignored in Klessydra
     INSTR_RDATA_WIDTH       : integer := 32;  -- ignored in Klessydra
     N_HWLP                  : integer := 2;   -- ignored in Klessydra
-    N_HWLP_BITS             : integer := 4    -- ignored in Klessydra
+    N_HWLP_BITS             : integer := 4;    -- ignored in Klessydra
+    PMP_REGIONS : natural := 64 -- Numero di regioni PMP supportate
+
     );
   port (
     -- clock, reset active low, test enable
@@ -71,6 +73,8 @@ entity klessydra_t0_3th_core is
     -- initialization signals 
     boot_addr_i             : in  std_logic_vector(31 downto 0);
     core_id_i               : in  std_logic_vector(3 downto 0);
+    cluster_id_i        : in  std_logic_vector(5 downto 0);
+
     -- program memory interface
     instr_req_o             : out std_logic;
     instr_gnt_i             : in  std_logic;
@@ -120,6 +124,8 @@ entity klessydra_t0_3th_core is
 end entity klessydra_t0_3th_core;
 
 architecture Klessydra_M of klessydra_t0_3th_core is
+  signal pmpaddr_internal : pmpaddr_array;
+  signal pmpcfg_internal : pmpcfg_array;
 
   constant THREAD_POOL_SIZE_GEN           : natural := work.riscv_klessydra.THREAD_POOL_SIZE;
   constant THREAD_POOL_SIZE_GLOBAL_GEN    : natural := work.riscv_klessydra.THREAD_POOL_SIZE_GLOBAL;
@@ -235,6 +241,26 @@ architecture Klessydra_M of klessydra_t0_3th_core is
   signal data_we_o_int          : std_logic;
   signal data_req_o_int         : std_logic;
 
+
+
+signal data_err_sync : std_logic;
+signal data_err_writeinternal    : std_logic;
+signal data_err_readinternal    : std_logic;
+signal instr_pmpvalid_internal : std_logic;
+signal instr_pmpvalid_sync : std_logic;
+signal load_op : std_logic;
+signal store_op : std_logic;
+
+
+
+
+
+
+
+
+
+
+
   function and_const(a: natural; b: natural) return natural is
     variable c : natural;
   begin
@@ -310,6 +336,8 @@ architecture Klessydra_M of klessydra_t0_3th_core is
 
   component CSR_Unit
   generic (
+        PMP_REGIONS             : natural := 64; -- Numero di regioni PMP supportate
+
     THREAD_POOL_SIZE_GLOBAL     : natural;
     THREAD_POOL_SIZE            : natural;
     MCYCLE_EN                   : natural;
@@ -367,7 +395,9 @@ architecture Klessydra_M of klessydra_t0_3th_core is
     irq_id_o                    : out std_logic_vector(4 downto 0);
     irq_ack_o                   : out std_logic;
     sw_irq                      : in  std_logic_vector(THREAD_POOL_SIZE_GLOBAL-1 downto 0);
-    sw_irq_pending              : in  std_logic_vector(THREAD_POOL_SIZE_GLOBAL-1 downto 0)
+    sw_irq_pending              : in  std_logic_vector(THREAD_POOL_SIZE_GLOBAL-1 downto 0);
+    pmpaddr                     : out pmpaddr_array ;  ---------------------------------------------------------------------aggiungo io
+    pmpcfg                      : out pmpcfg_array   ---------------------------------------------------------------------aggiungo io
     );
   end component;
 
@@ -457,6 +487,12 @@ architecture Klessydra_M of klessydra_t0_3th_core is
     data_wdata_o               : out std_logic_vector(31 downto 0);
     data_rdata_i               : in  std_logic_vector(31 downto 0);
     data_err_i                 : in  std_logic;
+    -- pmp out
+    load_op                    : out std_logic;
+    store_op                   : out std_logic;
+            errore_pmp : in std_logic;
+    error_pmp_write : in std_logic;
+
     -- interrupt request interface
     irq_i                      : in  std_logic;
     -- miscellanous control signals
@@ -477,25 +513,57 @@ architecture Klessydra_M of klessydra_t0_3th_core is
   );
   end component;
   
-  
+  component PMP_Unit is
+    generic (
+    PMP_REGIONS : natural := 64 -- Numero di regioni PMP supportate
+  );
+  port (
+    -- Data Memory interfece 
+    data_we_o               : in std_logic;
+    data_err_write              : out  std_logic;
+    data_err_read              : out  std_logic;
+    data_addr_o             : in std_logic_vector(31 downto 0);
+  -- program memory interface
+    instr_addr_o         : in std_logic_vector(31 downto 0);
+    instr_pmpvalid_o         : out  std_logic;
+
+  -- segnali di debug
+    addr_start_debug: out std_logic_vector(31 downto 0);
+    addr_end_debug: out std_logic_vector(31 downto 0);
+
+     -- pmp out
+    load_op                    : in std_logic;
+    store_op                   : in std_logic;
+
+    --PMP Registers Inputs
+    pmpcfg_in       : in  pmpcfg_array;
+    pmpaddr_in      : in  pmpaddr_array;
+    clk_i                      : in  std_logic;
+    rst_ni                     : in  std_logic
+
+  );
+end component;
+
 --------------------------------------------------------------------------------------------------
 ----------------------- ARCHITECTURE BEGIN -------------------------------------------------------              
 begin
-  data_we_o <= data_we_o_int;
-  data_req_o <= data_req_o_int;
 
   -- Connecting signals to ports
   data_we_o <= data_we_o_int;
   data_req_o <= data_req_o_int;
 
   sw_irq_o <= sw_irq;
+  
+
 
   assert (lutram_rf /= debug_en and lutram_rf /= 1) report "Debug-Unit cannot read from a LUTRAM regfile." severity WARNING;
 
   instr_addr_o <= pc_IF;
 
-  process(pc_except_value, set_except_condition, pc_IE, pc_except_value_wire, harc_EXEC) --VHDL1993
+  process(pc_except_value, set_except_condition, pc_IE, pc_except_value_wire, harc_EXEC,instr_gnt_i) --VHDL1993
   begin
+    instr_pmpvalid_sync <= instr_pmpvalid_internal and instr_gnt_i;
+    
     pc_except_value_wire <= pc_except_value;
     if set_except_condition  = '1' then
       pc_except_value_wire(harc_EXEC) <=  pc_IE;    
@@ -506,6 +574,9 @@ begin
   begin
     if rst_ni = '0' then
     elsif rising_edge(clk_i) then
+
+    --data_err_sync <= data_err_writeinternal or data_err_i;
+   --  instr_pmpvalid_sync <= instr_pmpvalid_internal;
       pc_except_value <= pc_except_value_wire;
     end if;
   end process;
@@ -556,11 +627,13 @@ begin
       irq_i                       => irq_i,
       fetch_enable_i              => fetch_enable_i,
       boot_addr_i                 => boot_addr_i,
-      instr_gnt_i                 => instr_gnt_i
+      instr_gnt_i                 => instr_pmpvalid_sync
       );
 
   CSR : CSR_Unit
     generic map (
+          PMP_REGIONS             => PMP_REGIONS,
+
       THREAD_POOL_SIZE_GLOBAL     => THREAD_POOL_SIZE_GLOBAL_GEN,
       THREAD_POOL_SIZE            => THREAD_POOL_SIZE_GEN,
       MCYCLE_EN                   => MCYCLE_EN,
@@ -617,7 +690,9 @@ begin
       irq_id_o                    => irq_id_o,
       irq_ack_o                   => irq_ack_o,
       sw_irq                      => sw_irq,
-      sw_irq_pending              => sw_irq_pending
+      sw_irq_pending              => sw_irq_pending,
+      pmpaddr                     => pmpaddr_internal,
+      pmpcfg                      => pmpcfg_internal  
       );
 
   Pipe : Pipeline
@@ -691,7 +766,7 @@ begin
       clk_i                      => clk_i,
       rst_ni                     => rst_ni,
       instr_req_o                => instr_req_o,
-      instr_gnt_i                => instr_gnt_i,
+      instr_gnt_i                => instr_pmpvalid_sync,
       instr_rvalid_i             => instr_rvalid_i,
       instr_rdata_i              => instr_rdata_i,
       data_req_o                 => data_req_o_int,
@@ -703,6 +778,11 @@ begin
       data_wdata_o               => data_wdata_o,
       data_rdata_i               => data_rdata_i,
       data_err_i                 => data_err_i,
+      load_op                    => load_op,
+      store_op                   => store_op,
+      errore_pmp                 => data_err_readinternal,
+          error_pmp_write =>       data_err_writeinternal,
+
       irq_i                      => irq_i,
       fetch_enable_i             => fetch_enable_i,
       core_busy_o                => core_busy_o,
@@ -717,6 +797,34 @@ begin
       RD_Data_IE                 => RD_Data_IE,
       state_LS                   => open
       );
+
+    PMP: PMP_Unit 
+    generic map (
+    PMP_REGIONS => PMP_REGIONS
+    )
+    port map (
+    -- Data Memory interfece 
+    data_we_o                    => data_we_o,
+    data_err_write     => data_err_writeinternal,
+    data_err_read     => data_err_readinternal,
+    data_addr_o              => data_addr_o,
+  -- program memory interface
+    instr_addr_o                    =>  pc_IF,
+    instr_pmpvalid_o => instr_pmpvalid_internal,
+          load_op                    => load_op,
+      store_op                   => store_op,
+    --PMP Registers Inputs
+    pmpcfg_in                           => pmpcfg_internal,
+    pmpaddr_in                    => pmpaddr_internal,
+    clk_i                                  => clk_i,
+    rst_ni                                        => rst_ni
+
+  );
+
+
+
+
+
 
 end Klessydra_M;
 --------------------------------------------------------------------------------------------------

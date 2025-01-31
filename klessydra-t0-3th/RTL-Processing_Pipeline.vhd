@@ -110,6 +110,12 @@ entity Pipeline is
     data_wdata_o               : out std_logic_vector(31 downto 0);
     data_rdata_i               : in  std_logic_vector(31 downto 0);
     data_err_i                 : in  std_logic;
+    -- pmp out
+    load_op                    : out std_logic;
+    store_op                   : out std_logic;
+       errore_pmp : in std_logic;
+    error_pmp_write : in std_logic;
+
     -- interrupt request interface
     irq_i                      : in  std_logic;
     -- miscellanous control signals
@@ -201,8 +207,8 @@ architecture Pipe of Pipeline is
   signal amo_load_skip          : std_logic;
   signal amo_load               : std_logic;
   signal amo_store              : std_logic;
-  signal load_op                : std_logic;
-  signal store_op               : std_logic;
+  --signal load_op                : std_logic;
+  --signal store_op               : std_logic;
   --signal sw_mip                 : std_logic;
   signal signed_op              : std_logic;
 
@@ -450,6 +456,9 @@ architecture Pipe of Pipeline is
     harc_LS_WB                 : out harc_range;
     instr_word_LS_WB           : out std_logic_vector(31 downto 0);
     LS_WB                      : out std_logic_vector(31 downto 0);
+        errore_pmp : in std_logic;
+    error_pmp_write : in std_logic;
+
     -- Data memory interface
     data_req_o                 : out std_logic;
     data_gnt_i                 : in  std_logic;
@@ -795,6 +804,9 @@ begin
     harc_LS_WB                 => harc_LS_WB,
     instr_word_LS_WB           => instr_word_LS_WB,
     LS_WB                      => LS_WB,
+        errore_pmp => errore_pmp,
+    error_pmp_write => error_pmp_write,
+
     data_req_o                 => data_req_o,   
     data_gnt_i                 => data_gnt_i,            
     data_rvalid_i              => data_rvalid_i,         

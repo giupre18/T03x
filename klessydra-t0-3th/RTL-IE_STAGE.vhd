@@ -418,7 +418,8 @@ begin
                 elsif zero_rs1 = '1' then
                   IE_WB <= (others => '0');
                 elsif pass_BEQ = '1' then
-                  IE_WB <= (31 downto 1 => '0') & '1';
+                  IE_WB <= (31 downto 1 => '0', 0 => '1');
+
                 elsif pass_BLTU = '1' then
                   IE_WB <= (others => '0');
                 else
@@ -435,7 +436,7 @@ begin
               --    IE_WB <= (others => '0');
                 elsif pass_BEQ = '1' then
                   if RS2_DATA_IE(31) = RS1_DATA_IE(31) then
-                    IE_WB <= (31 downto 1 => '0') & '1';
+                    IE_WB <= (31 downto 1 => '0', 0 => '1');
                   else
                     IE_WB <= (31 downto 0 => '1');
                   end if;
@@ -800,10 +801,12 @@ begin
               case state_div is
                 when init =>
                   if RS1_Data_IE(31) = '0' or signed_op = '0' then
-                    res_wire <= (31 downto 0 => '0') & RS1_Data_IE;
+                   res_wire <= (63 downto 32 => RS1_Data_IE, 31 downto 0 => '0');
+
                   else
                     RS1_Data_IE_int_wire <= std_logic_vector(signed(not(RS1_Data_IE)) + 1);
-                    res_wire <= (31 downto 0 => '0') & RS1_Data_IE_int_wire;
+                    res_wire <=(63 downto 32 => RS1_Data_IE_int_wire, 31 downto 0 => '0');
+
                   end if;
                   if RS2_Data_IE(31) = '0' or signed_op = '0' then
                     RS2_Data_IE_int_wire <= RS2_Data_IE;
