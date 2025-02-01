@@ -297,10 +297,10 @@ begin
         pmpaddr_internal(1)       := x"00040800";
         pmpaddr_internal(2)       := x"20000000";
         pmpaddr_internal(3)       := x"23FFFFFF";
+        
         pmpaddr_internal(4 to pmpaddr_internal'length-1) := (others => (others => '0'));
 
         pmpcfg_internal(0)        := x"8F8F8E8F";
-        pmpcfg_internal(1)        := x"00000808";
         pmpcfg_internal(2 to pmpcfg_internal'length-1) := (others => (others => '0'));
    
       elsif rising_edge(clk_i) then

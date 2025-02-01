@@ -66,10 +66,6 @@ entity Load_Store_Unit is
     harc_LS_WB                 : out natural range THREAD_POOL_SIZE-1 downto 0;
     instr_word_LS_WB           : out std_logic_vector(31 downto 0);
     LS_WB                      : out std_logic_vector(31 downto 0);
-    --pmp error
-    errore_pmp : in std_logic;
-    error_pmp_write : in std_logic;
-
         -- Data memory interface
     data_req_o                 : out std_logic;
     data_gnt_i                 : in  std_logic;
@@ -119,8 +115,7 @@ architecture LSU of Load_Store_Unit is
   signal LS_WB_EN_int               : std_logic;
   signal amo_store_int              : std_logic;
   signal state_LS_int               : fsm_LS_states;
-  signal load_err_primario          : std_logic;
-  signal store_err_primario         : std_logic;
+
  
 
 begin
@@ -135,10 +130,9 @@ begin
   state_LS <= state_LS_int;
 
   -- Memory fault signals
-  load_err_primario  <= data_gnt_i and data_err_i and not(data_we_o_int);
-  load_err <= load_err_primario or errore_pmp;
-  store_err_primario <= data_gnt_i and data_err_i and data_we_o_int;
-  store_err <= store_err_primario or error_pmp_write;
+  load_err  <= data_gnt_i and data_err_i and not(data_we_o_int);
+  store_err <= data_gnt_i and data_err_i and data_we_o_int;
+
 
   -- Memory address signal
   data_addr_o <= data_addr_internal_int(31 downto 2) & "00";

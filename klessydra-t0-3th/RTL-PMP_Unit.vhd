@@ -16,10 +16,15 @@ entity PMP_Unit is
   );
   port (
     -- Data Memory interfece 
+    data_we_pmp              :out std_logic;
     data_we_o               : in std_logic;
-    data_err_write              : out  std_logic;
-    data_err_read              : out  std_logic;
+
+    data_addr_pmp        :out std_logic_vector(31 downto 0);
     data_addr_o             : in std_logic_vector(31 downto 0);
+
+    data_gnt_pmp             :out std_logic;
+    data_gnt_effettivo       : in std_logic;
+
   -- program memory interface
     instr_addr_o	       : in std_logic_vector(31 downto 0);
     instr_pmpvalid_o	       : out  std_logic;
@@ -27,9 +32,6 @@ entity PMP_Unit is
   -- segnali di debug
     addr_start_debug: out std_logic_vector(31 downto 0);
     addr_end_debug: out std_logic_vector(31 downto 0);
-     -- pmp out
-    load_op                    : in std_logic;
-    store_op                   : in std_logic;
 
     --PMP Registers Inputs
     pmpcfg_in       : in  pmpcfg_array;
@@ -111,13 +113,12 @@ function extract_pmpcfg_in_field(
   end function;
 
 
-signal access_type_datamem : std_logic_vector(1 downto 0); 
-
+--signal access_type_datamem : std_logic_vector(1 downto 0); 
+--signal data_we_pmp_int :std_logic;
 
 begin
 
-
-process (clk_i, rst_ni)
+process (pmpcfg_in, pmpaddr_in, data_addr_o, data_we_o, instr_addr_o,data_gnt_effettivo)
     variable pmpcfg_in_field : std_logic_vector(7 downto 0) ;
     variable match_type : pmp_match_type ; 
     variable addr_start :  unsigned(31 downto 0);
@@ -126,24 +127,16 @@ process (clk_i, rst_ni)
     variable napot_mask : std_logic_vector(31 downto 0);
     variable nand_result : unsigned(31 downto 0);
     variable access_valid_found, access_valid_found_instr :  std_logic  := '0';
-    --variable access_type_datamem : std_logic_vector(1 downto 0); 
+   
 
 begin
 
-if rst_ni='0'then
-  instr_pmpvalid_o <= '0';
-  data_err_write<= '0';
-  data_err_read <= '0'; 
-elsif rising_edge(clk_i) then
-    
     instr_pmpvalid_o <= '0';
-    data_err_write <= '0'; -- Default: nessun errore  
-    data_err_read <= '0';
-    access_type_datamem <= "0" & data_we_o;
     access_valid_found := '0';
     access_valid_found_instr := '0';
-
-
+    data_gnt_pmp <= data_gnt_effettivo;
+    data_we_pmp <= data_we_o;
+    data_addr_pmp <= data_addr_o;
 
 for i in 0 to PMP_REGIONS-1 loop
 
@@ -188,29 +181,22 @@ for i in 0 to PMP_REGIONS-1 loop
 
 -----data_addr_o
 
+
       -- Verifica se l'indirizzo di accesso rientra nella regione
       if data_addr_o >= std_logic_vector(addr_start) then
        	if data_addr_o <= std_logic_vector(addr_end) then
            access_valid_found := '1'; -- Accesso valido trovato
-       
-    	    if check_permissions(pmpcfg_in_field , "00") = '1' then
-                  data_err_read <=  '0'; -- Accesso permesso
-
-          else
-                  data_err_read <=  '1';
-         end if;
-
-          if check_permissions(pmpcfg_in_field , "01") = '1' then
-                  data_err_write <= '0';
-           else
-                  data_err_write <=  '1';
+    	    if check_permissions(pmpcfg_in_field , "01") = '0' or check_permissions(pmpcfg_in_field , "00") = '0' then
+                  data_gnt_pmp<='0';
+                  data_we_pmp <= '0';
+                  data_addr_pmp<=(others => '0');
           end if;
-
         exit;
         end if;  
       end if;
 end loop;
-          addr_start_debug<= std_logic_vector(addr_start);
+
+   addr_start_debug<= std_logic_vector(addr_start);
    addr_end_debug <= std_logic_vector(addr_end);
 
 for i in 0 to PMP_REGIONS-1 loop
@@ -258,15 +244,15 @@ for i in 0 to PMP_REGIONS-1 loop
 
 
 ----instr_addr_o
-    if instr_addr_o >= std_logic_vector(addr_start) then
-       if instr_addr_o <= std_logic_vector(addr_end) then
-          access_valid_found_instr:= '1'; -- Accesso valido trovato
-          if check_permissions(pmpcfg_in_field , "10") = '1' then
-                             instr_pmpvalid_o <= '1'; 
-          end if;
-          exit;
-       end if;   
-    end if;
+    --if instr_addr_o >= std_logic_vector(addr_start) then
+      -- if instr_addr_o <= std_logic_vector(addr_end) then
+        --  access_valid_found_instr:= '1'; -- Accesso valido trovato
+          --if check_permissions(pmpcfg_in_field , "10") = '1' then
+            --                 instr_pmpvalid_o <= '1'; 
+          --end if;
+          --exit;
+       --end if;   
+    --end if;
 end loop;
 
 
@@ -274,21 +260,22 @@ end loop;
 
 
    if access_valid_found = '0' then
-      data_err_write <= '1';
-      data_err_read <= '0';
+      data_gnt_pmp<='0';
    end if;
 
 
-   if access_valid_found_instr = '0' then
-       instr_pmpvalid_o <= '0';
-   end if;
+   --if access_valid_found_instr = '0' then
+    --   instr_pmpvalid_o <= '0';
+   --end if;
 
 
 
-end if;
+--end if;
 
 
 
   end process;
+
+
 
 end RTL;

@@ -248,14 +248,13 @@ signal data_err_writeinternal    : std_logic;
 signal data_err_readinternal    : std_logic;
 signal instr_pmpvalid_internal : std_logic;
 signal instr_pmpvalid_sync : std_logic;
-signal load_op : std_logic;
-signal store_op : std_logic;
 
 
-
-
-
-
+signal data_gnt_pmp_internal :std_logic;
+signal data_we_pmp_internal : std_logic;
+       
+signal data_addr_pmp_internal :std_logic_vector(31 downto 0);
+signal data_addr_pipe_internal :std_logic_vector(31 downto 0);
 
 
 
@@ -487,12 +486,6 @@ signal store_op : std_logic;
     data_wdata_o               : out std_logic_vector(31 downto 0);
     data_rdata_i               : in  std_logic_vector(31 downto 0);
     data_err_i                 : in  std_logic;
-    -- pmp out
-    load_op                    : out std_logic;
-    store_op                   : out std_logic;
-            errore_pmp : in std_logic;
-    error_pmp_write : in std_logic;
-
     -- interrupt request interface
     irq_i                      : in  std_logic;
     -- miscellanous control signals
@@ -519,10 +512,14 @@ signal store_op : std_logic;
   );
   port (
     -- Data Memory interfece 
+    data_we_pmp              :out std_logic;
     data_we_o               : in std_logic;
-    data_err_write              : out  std_logic;
-    data_err_read              : out  std_logic;
+
+    data_addr_pmp         :out std_logic_vector(31 downto 0);
     data_addr_o             : in std_logic_vector(31 downto 0);
+
+    data_gnt_pmp             :out std_logic;
+    data_gnt_effettivo       : in std_logic;
   -- program memory interface
     instr_addr_o         : in std_logic_vector(31 downto 0);
     instr_pmpvalid_o         : out  std_logic;
@@ -531,10 +528,7 @@ signal store_op : std_logic;
     addr_start_debug: out std_logic_vector(31 downto 0);
     addr_end_debug: out std_logic_vector(31 downto 0);
 
-     -- pmp out
-    load_op                    : in std_logic;
-    store_op                   : in std_logic;
-
+    
     --PMP Registers Inputs
     pmpcfg_in       : in  pmpcfg_array;
     pmpaddr_in      : in  pmpaddr_array;
@@ -549,8 +543,10 @@ end component;
 begin
 
   -- Connecting signals to ports
-  data_we_o <= data_we_o_int;
-  data_req_o <= data_req_o_int;
+  data_we_o <= data_we_pmp_internal;
+ data_req_o <= data_req_o_int;
+ data_addr_o <= data_addr_pmp_internal;
+--data_req_o <= data_req_pmp_internal;
 
   sw_irq_o <= sw_irq;
   
@@ -562,7 +558,7 @@ begin
 
   process(pc_except_value, set_except_condition, pc_IE, pc_except_value_wire, harc_EXEC,instr_gnt_i) --VHDL1993
   begin
-    instr_pmpvalid_sync <= instr_pmpvalid_internal and instr_gnt_i;
+    --instr_pmpvalid_sync <= instr_pmpvalid_internal and instr_gnt_i;
     
     pc_except_value_wire <= pc_except_value;
     if set_except_condition  = '1' then
@@ -627,7 +623,7 @@ begin
       irq_i                       => irq_i,
       fetch_enable_i              => fetch_enable_i,
       boot_addr_i                 => boot_addr_i,
-      instr_gnt_i                 => instr_pmpvalid_sync
+      instr_gnt_i                 => instr_gnt_i
       );
 
   CSR : CSR_Unit
@@ -682,9 +678,9 @@ begin
       core_id_i                   => core_id_i,
       instr_rvalid_i              => instr_rvalid_i,
       instr_rvalid_IE             => instr_rvalid_IE,
-      data_we_o                   => data_we_o_int,
+      data_we_o                   => data_we_pmp_internal,
       data_req_o                  => data_req_o_int,
-      data_gnt_i                  => data_gnt_i,
+      data_gnt_i                  => data_gnt_pmp_internal,
       irq_i                       => irq_i,
       irq_id_i                    => irq_id_i,
       irq_id_o                    => irq_id_o,
@@ -766,23 +762,18 @@ begin
       clk_i                      => clk_i,
       rst_ni                     => rst_ni,
       instr_req_o                => instr_req_o,
-      instr_gnt_i                => instr_pmpvalid_sync,
+      instr_gnt_i                => instr_gnt_i,
       instr_rvalid_i             => instr_rvalid_i,
       instr_rdata_i              => instr_rdata_i,
       data_req_o                 => data_req_o_int,
-      data_gnt_i                 => data_gnt_i,
+      data_gnt_i                 => data_gnt_pmp_internal,
       data_rvalid_i              => data_rvalid_i,
       data_we_o                  => data_we_o_int,
       data_be_o                  => data_be_o,
-      data_addr_o                => data_addr_o,
+      data_addr_o                => data_addr_pipe_internal,
       data_wdata_o               => data_wdata_o,
       data_rdata_i               => data_rdata_i,
       data_err_i                 => data_err_i,
-      load_op                    => load_op,
-      store_op                   => store_op,
-      errore_pmp                 => data_err_readinternal,
-          error_pmp_write =>       data_err_writeinternal,
-
       irq_i                      => irq_i,
       fetch_enable_i             => fetch_enable_i,
       core_busy_o                => core_busy_o,
@@ -804,15 +795,19 @@ begin
     )
     port map (
     -- Data Memory interfece 
-    data_we_o                    => data_we_o,
-    data_err_write     => data_err_writeinternal,
-    data_err_read     => data_err_readinternal,
-    data_addr_o              => data_addr_o,
+    -- 
+    data_we_pmp => data_we_pmp_internal,
+    data_we_o                    => data_we_o_int,
+
+    data_gnt_pmp             => data_gnt_pmp_internal,
+    data_gnt_effettivo       => data_gnt_i,
+
+    data_addr_pmp     => data_addr_pmp_internal,
+    data_addr_o              => data_addr_pipe_internal,
   -- program memory interface
     instr_addr_o                    =>  pc_IF,
     instr_pmpvalid_o => instr_pmpvalid_internal,
-          load_op                    => load_op,
-      store_op                   => store_op,
+
     --PMP Registers Inputs
     pmpcfg_in                           => pmpcfg_internal,
     pmpaddr_in                    => pmpaddr_internal,
