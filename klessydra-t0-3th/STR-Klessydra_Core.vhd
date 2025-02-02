@@ -260,8 +260,12 @@ signal data_addr_pmp_internal :std_logic_vector(31 downto 0);
 signal data_addr_pipe_internal :std_logic_vector(31 downto 0);
 
 
+ signal ie_except_data_pmp           :  std_logic_vector(31 downto 0);
+ signal   IE_except_condition_pmp       :  std_logic;
+ signal   ie_taken_branch_pmp           :  std_logic; 
 
-
+signal set_except_condition_pmp : std_logic;
+signal taken_branch_pmp : std_logic;
 
   function and_const(a: natural; b: natural) return natural is
     variable c : natural;
@@ -532,6 +536,20 @@ signal data_addr_pipe_internal :std_logic_vector(31 downto 0);
     instr_gnt_pmp             :out std_logic;
     instr_gnt_effettivo       : in std_logic;
 
+    ie_except_data            : in std_logic_vector(31 downto 0);
+    IE_except_condition       : in std_logic;
+    ie_taken_branch           : in std_logic; 
+
+    ie_except_data_pmp           : out std_logic_vector(31 downto 0);
+    IE_except_condition_pmp       : out std_logic;
+    ie_taken_branch_pmp           : out std_logic; 
+
+    set_except_condition          : in std_logic;
+    taken_branch                  : in std_logic;
+
+    set_except_condition_pmp          : out std_logic;
+    taken_branch_pmp                  : out std_logic;
+
   -- segnali di debug
     addr_start_debug: out std_logic_vector(31 downto 0);
     addr_end_debug: out std_logic_vector(31 downto 0);
@@ -592,13 +610,13 @@ begin
       data_we_o_lat               => data_we_o_lat,
       absolute_address            => absolute_address,       
       PC_offset                   => PC_offset,
-      taken_branch                => taken_branch,
-      ie_taken_branch             => ie_taken_branch,
+      taken_branch                => taken_branch_pmp,
+      ie_taken_branch             => ie_taken_branch_pmp,
       ls_taken_branch             => ls_taken_branch,
       set_branch_condition        => set_branch_condition,
-      ie_except_condition         => ie_except_condition,
+      ie_except_condition         => ie_except_condition_pmp,
       ls_except_condition         => ls_except_condition,
-      set_except_condition        => set_except_condition,
+      set_except_condition        => set_except_condition_pmp,
       set_mret_condition          => set_mret_condition,
       set_wfi_condition           => set_wfi_condition,
       harc_ID                     => harc_ID,
@@ -646,7 +664,7 @@ begin
     )
     port map(
       pc_IE                       => pc_IE,
-      ie_except_data              => ie_except_data,
+      ie_except_data              => ie_except_data_pmp,
       ls_except_data              => ls_except_data,
       served_ie_except_condition  => served_ie_except_condition,
       served_ls_except_condition  => served_ls_except_condition,
@@ -817,6 +835,19 @@ begin
     
     instr_gnt_pmp => instr_gnt_pmp,
     instr_gnt_effettivo => instr_gnt_i,
+
+    ie_except_data_pmp         => ie_except_data_pmp,
+    IE_except_condition_pmp      => IE_except_condition_pmp,
+    ie_taken_branch_pmp           =>  ie_taken_branch_pmp,
+    ie_except_data         => ie_except_data,
+    IE_except_condition      => IE_except_condition,
+    ie_taken_branch           =>  ie_taken_branch,
+
+    set_except_condition          => set_except_condition,
+    taken_branch                  => taken_branch,
+
+    set_except_condition_pmp          =>set_except_condition_pmp,
+    taken_branch_pmp                  =>    taken_branch_pmp,
 
 
     --PMP Registers Inputs

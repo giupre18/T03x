@@ -37,6 +37,21 @@ entity PMP_Unit is
     
 
 
+
+    ie_except_data            : in std_logic_vector(31 downto 0);
+    IE_except_condition       : in std_logic;
+    ie_taken_branch           : in std_logic; 
+
+    ie_except_data_pmp           : out std_logic_vector(31 downto 0);
+    IE_except_condition_pmp       : out std_logic;
+    ie_taken_branch_pmp           : out std_logic; 
+
+    set_except_condition          : in std_logic;
+    taken_branch                  : in std_logic;
+
+    set_except_condition_pmp          : out std_logic;
+    taken_branch_pmp                  : out std_logic;
+
   -- segnali di debug
     addr_start_debug: out std_logic_vector(31 downto 0);
     addr_end_debug: out std_logic_vector(31 downto 0);
@@ -126,7 +141,7 @@ function extract_pmpcfg_in_field(
 
 begin
 
-process (pmpcfg_in, pmpaddr_in, data_addr_o, data_we_o, instr_addr_o,data_gnt_effettivo,instr_gnt_effettivo)
+process (pmpcfg_in, pmpaddr_in, data_addr_o, data_we_o, instr_addr_o,data_gnt_effettivo,instr_gnt_effettivo,ie_except_data,IE_except_condition,ie_taken_branch,set_except_condition,taken_branch)
     variable pmpcfg_in_field : std_logic_vector(7 downto 0) ;
     variable match_type : pmp_match_type ; 
     variable addr_start :  unsigned(31 downto 0);
@@ -138,6 +153,15 @@ process (pmpcfg_in, pmpaddr_in, data_addr_o, data_we_o, instr_addr_o,data_gnt_ef
    
 
 begin
+      set_except_condition_pmp <= set_except_condition;
+      taken_branch_pmp <= taken_branch;
+
+
+
+    ie_except_data_pmp <= ie_except_data;
+    IE_except_condition_pmp <= IE_except_condition;
+    ie_taken_branch_pmp <= ie_taken_branch;
+
     instr_addr_pmp <= instr_addr_o;
     ---instr_rvalid_effettivo <= '0';
     access_valid_found := '0';
@@ -259,7 +283,12 @@ for i in 0 to PMP_REGIONS-1 loop
          access_valid_found_instr:= '1'; -- Accesso valido trovato
           if check_permissions(pmpcfg_in_field , "10") = '0' then
                   instr_gnt_pmp<='0';
-                  instr_addr_pmp<= x"00000013";
+                  ie_taken_branch_pmp <= '1';
+                  IE_except_condition_pmp <= '1';
+                   set_except_condition_pmp <= '1';
+                   taken_branch_pmp <= '1';
+                  ie_except_data_pmp <= ILLEGAL_INSN_EXCEPT_CODE;
+                  --instr_addr_pmp<= x"00000013";
           end if;
           exit;
        end if;   
