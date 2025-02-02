@@ -27,7 +27,15 @@ entity PMP_Unit is
 
   -- program memory interface
     instr_addr_o	       : in std_logic_vector(31 downto 0);
+    instr_addr_pmp       : out std_logic_vector(31 downto 0);
+
     instr_pmpvalid_o	       : out  std_logic;
+
+
+    instr_gnt_pmp             :out std_logic;
+    instr_gnt_effettivo       : in std_logic;
+    
+
 
   -- segnali di debug
     addr_start_debug: out std_logic_vector(31 downto 0);
@@ -118,7 +126,7 @@ function extract_pmpcfg_in_field(
 
 begin
 
-process (pmpcfg_in, pmpaddr_in, data_addr_o, data_we_o, instr_addr_o,data_gnt_effettivo)
+process (pmpcfg_in, pmpaddr_in, data_addr_o, data_we_o, instr_addr_o,data_gnt_effettivo,instr_gnt_effettivo)
     variable pmpcfg_in_field : std_logic_vector(7 downto 0) ;
     variable match_type : pmp_match_type ; 
     variable addr_start :  unsigned(31 downto 0);
@@ -130,13 +138,15 @@ process (pmpcfg_in, pmpaddr_in, data_addr_o, data_we_o, instr_addr_o,data_gnt_ef
    
 
 begin
-
-    instr_pmpvalid_o <= '0';
+    instr_addr_pmp <= instr_addr_o;
+    ---instr_rvalid_effettivo <= '0';
     access_valid_found := '0';
     access_valid_found_instr := '0';
     data_gnt_pmp <= data_gnt_effettivo;
     data_we_pmp <= data_we_o;
     data_addr_pmp <= data_addr_o;
+
+   instr_gnt_pmp<=instr_gnt_effettivo;
 
 for i in 0 to PMP_REGIONS-1 loop
 
@@ -244,15 +254,16 @@ for i in 0 to PMP_REGIONS-1 loop
 
 
 ----instr_addr_o
-    --if instr_addr_o >= std_logic_vector(addr_start) then
-      -- if instr_addr_o <= std_logic_vector(addr_end) then
-        --  access_valid_found_instr:= '1'; -- Accesso valido trovato
-          --if check_permissions(pmpcfg_in_field , "10") = '1' then
-            --                 instr_pmpvalid_o <= '1'; 
-          --end if;
-          --exit;
-       --end if;   
-    --end if;
+    if instr_addr_o >= std_logic_vector(addr_start) then
+       if instr_addr_o <= std_logic_vector(addr_end) then
+         access_valid_found_instr:= '1'; -- Accesso valido trovato
+          if check_permissions(pmpcfg_in_field , "10") = '0' then
+                  instr_gnt_pmp<='0';
+                  instr_addr_pmp<= x"00000013";
+          end if;
+          exit;
+       end if;   
+    end if;
 end loop;
 
 
@@ -265,7 +276,7 @@ end loop;
 
 
    --if access_valid_found_instr = '0' then
-    --   instr_pmpvalid_o <= '0';
+    --   instr_rvalid_effettivo <= '0';
    --end if;
 
 

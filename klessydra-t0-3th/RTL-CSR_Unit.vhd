@@ -300,8 +300,8 @@ begin
         
         pmpaddr_internal(4 to pmpaddr_internal'length-1) := (others => (others => '0'));
 
-        pmpcfg_internal(0)        := x"8F8F8E8F";
-        pmpcfg_internal(2 to pmpcfg_internal'length-1) := (others => (others => '0'));
+        pmpcfg_internal(0)        := x"8F8F8F8F";
+        pmpcfg_internal(1 to pmpcfg_internal'length-1) := (others => (others => '0'));
    
       elsif rising_edge(clk_i) then
         pmpcfg <= pmpcfg_internal; ---------------------------------------------------------------------aggiungo io

@@ -253,6 +253,9 @@ signal instr_pmpvalid_sync : std_logic;
 signal data_gnt_pmp_internal :std_logic;
 signal data_we_pmp_internal : std_logic;
        
+signal instr_gnt_pmp :std_logic;
+signal instr_addr_pmp : std_logic_vector (31 downto 0);
+
 signal data_addr_pmp_internal :std_logic_vector(31 downto 0);
 signal data_addr_pipe_internal :std_logic_vector(31 downto 0);
 
@@ -522,7 +525,12 @@ signal data_addr_pipe_internal :std_logic_vector(31 downto 0);
     data_gnt_effettivo       : in std_logic;
   -- program memory interface
     instr_addr_o         : in std_logic_vector(31 downto 0);
+    instr_addr_pmp       :out std_logic_vector(31 downto 0);
+
     instr_pmpvalid_o         : out  std_logic;
+
+    instr_gnt_pmp             :out std_logic;
+    instr_gnt_effettivo       : in std_logic;
 
   -- segnali di debug
     addr_start_debug: out std_logic_vector(31 downto 0);
@@ -554,12 +562,10 @@ begin
 
   assert (lutram_rf /= debug_en and lutram_rf /= 1) report "Debug-Unit cannot read from a LUTRAM regfile." severity WARNING;
 
-  instr_addr_o <= pc_IF;
+  instr_addr_o <= instr_addr_pmp;
 
-  process(pc_except_value, set_except_condition, pc_IE, pc_except_value_wire, harc_EXEC,instr_gnt_i) --VHDL1993
+  process(pc_except_value, set_except_condition, pc_IE, pc_except_value_wire, harc_EXEC) --VHDL1993
   begin
-    --instr_pmpvalid_sync <= instr_pmpvalid_internal and instr_gnt_i;
-    
     pc_except_value_wire <= pc_except_value;
     if set_except_condition  = '1' then
       pc_except_value_wire(harc_EXEC) <=  pc_IE;    
@@ -623,7 +629,7 @@ begin
       irq_i                       => irq_i,
       fetch_enable_i              => fetch_enable_i,
       boot_addr_i                 => boot_addr_i,
-      instr_gnt_i                 => instr_gnt_i
+      instr_gnt_i                 => instr_gnt_pmp
       );
 
   CSR : CSR_Unit
@@ -762,7 +768,7 @@ begin
       clk_i                      => clk_i,
       rst_ni                     => rst_ni,
       instr_req_o                => instr_req_o,
-      instr_gnt_i                => instr_gnt_i,
+      instr_gnt_i                => instr_gnt_pmp,
       instr_rvalid_i             => instr_rvalid_i,
       instr_rdata_i              => instr_rdata_i,
       data_req_o                 => data_req_o_int,
@@ -806,7 +812,12 @@ begin
     data_addr_o              => data_addr_pipe_internal,
   -- program memory interface
     instr_addr_o                    =>  pc_IF,
+    instr_addr_pmp => instr_addr_pmp,
     instr_pmpvalid_o => instr_pmpvalid_internal,
+    
+    instr_gnt_pmp => instr_gnt_pmp,
+    instr_gnt_effettivo => instr_gnt_i,
+
 
     --PMP Registers Inputs
     pmpcfg_in                           => pmpcfg_internal,
