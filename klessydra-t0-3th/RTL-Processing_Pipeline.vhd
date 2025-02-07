@@ -42,6 +42,7 @@ entity Pipeline is
     RF_CEIL                    : natural
   );
   port (
+    exception_pmp                   : in std_logic;
     pc_IF                      : in  std_logic_vector(31 downto 0);
     harc_IF                    : in  natural range THREAD_POOL_SIZE-1 downto 0;
     irq_pending                : in  std_logic_vector(THREAD_POOL_SIZE-1 downto 0);
@@ -288,6 +289,7 @@ architecture Pipe of Pipeline is
   signal set_except_condition_int    : std_logic;
   signal state_LS_int                : fsm_LS_states;
 
+  signal exception_pmp_fetch, exception_pmp_decode,exception_pmp_exe :std_logic;
 
   function rs1 (signal instr : in std_logic_vector(31 downto 0)) return integer is
   begin
@@ -310,6 +312,8 @@ architecture Pipe of Pipeline is
     THREAD_POOL_SIZE           : natural
     );
   port (
+    exception_pmp_fetch              : in  std_logic;
+    exception_pmp_decode             : out std_logic;
     pc_IF                      : in  std_logic_vector(31 downto 0);
     busy_ID                    : in  std_logic;  
     instr_rvalid_i             : in  std_logic;
@@ -348,6 +352,8 @@ architecture Pipe of Pipeline is
     );
   port (
   -- Branch Control Signals
+    exception_pmp_decode             : in std_logic;
+    exception_pmp_exe              : out std_logic;
     comparator_en              : out std_logic;
     ls_instr_req               : out std_logic;
     ie_instr_req               : out std_logic;
@@ -471,6 +477,8 @@ architecture Pipe of Pipeline is
     RF_CEIL                   : natural
   );
   port (
+
+    exception_pmp_exe                  : in std_logic; 
      -- clock, and reset active low
     clk_i, rst_ni             : in  std_logic;
     instr_gnt_i               : in  std_logic;
@@ -667,6 +675,8 @@ begin
     RF_CEIL                    => RF_CEIL
     )
   port map(
+    exception_pmp_fetch             => exception_pmp,
+    exception_pmp_decode            => exception_pmp_decode,
     pc_IF                      => pc_IF,
     busy_ID                    => busy_ID,   
     instr_rvalid_i             => instr_rvalid_i,
@@ -700,6 +710,8 @@ begin
     RF_SIZE                    => RF_SIZE
     )
   port map(            
+    exception_pmp_decode             => exception_pmp_decode,
+    exception_pmp_exe              => exception_pmp_exe,
     comparator_en              => comparator_en,
     ie_instr_req               => ie_instr_req,        
     ls_instr_req               => ls_instr_req,        
@@ -814,6 +826,7 @@ begin
     RF_CEIL                    => RF_CEIL
   )
   port map(
+        exception_pmp_exe               => exception_pmp_exe,
     clk_i                      => clk_i,
     rst_ni                     => rst_ni,
     instr_gnt_i                => instr_gnt_i,

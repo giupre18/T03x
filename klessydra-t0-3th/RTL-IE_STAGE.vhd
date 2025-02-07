@@ -31,6 +31,7 @@ entity IE_STAGE is
     RF_CEIL                   : natural
   );
   port (
+        exception_pmp_exe                  : in std_logic; 
   -- clock, and reset active low
     clk_i, rst_ni             : in  std_logic;
     instr_gnt_i               : in  std_logic;
@@ -379,7 +380,7 @@ begin
               ie_except_data <= ECALL_EXCEPT_CODE;
             end if;
 
-            if decoded_instruction_IE(ILL_bit_position) = '1' then
+            if decoded_instruction_IE(ILL_bit_position) = '1' or  exception_pmp_exe = '1' then
               ie_except_data <= ILLEGAL_INSN_EXCEPT_CODE;
             end if;
 
@@ -733,10 +734,11 @@ begin
             end if;
           end if;
 
-          if decoded_instruction_IE(ILL_bit_position) = '1' then  -- ILLEGAL_INSTRUCTION
+          if decoded_instruction_IE(ILL_bit_position) = '1' or exception_pmp_exe = '1' then  -- ILLEGAL_INSTRUCTION
             IE_except_condition_wires := '1';
             ie_taken_branch_wires     := '1';
           end if;
+
 
           if RV32M = 1 then
 

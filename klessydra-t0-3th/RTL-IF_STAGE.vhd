@@ -26,6 +26,8 @@ entity IF_STAGE is
     RF_CEIL                    : natural
     );
   port(
+    exception_pmp_fetch              : in  std_logic;
+    exception_pmp_decode             : out std_logic;
     pc_IF                      : in  std_logic_vector(31 downto 0);
     busy_ID                    : in  std_logic;
     instr_rvalid_i             : in  std_logic;
@@ -73,6 +75,7 @@ architecture FETCH of IF_STAGE is
   signal rs2_valid_ID_lat        : std_logic;
   signal rd_valid_ID_lat         : std_logic;
   signal rd_read_valid_ID_lat    : std_logic;
+  signal exception_pmp_busy : std_logic ;
 
   function rs1 (signal instr : in std_logic_vector(31 downto 0)) return integer is
   begin
@@ -103,11 +106,15 @@ begin
 ----------------------------------------------------------------------------------------------------
 
 
-  instr_req_o <= not busy_ID;
-
+  
+instr_req_o <= not busy_ID;
   process(clk_i, rst_ni)
   begin
     if rising_edge(clk_i) then
+    exception_pmp_decode<= exception_pmp_fetch;
+    if exception_pmp_fetch ='1' then
+       exception_pmp_busy <='1';
+       end if;
       if instr_gnt_i = '1' then
         pc_ID   <= pc_IF;
         harc_ID <= harc_IF;

@@ -51,7 +51,7 @@ entity PMP_Unit is
 
     set_except_condition_pmp          : out std_logic;
     taken_branch_pmp                  : out std_logic;
-
+    exception_pmp   : out std_logic;
   -- segnali di debug
     addr_start_debug: out std_logic_vector(31 downto 0);
     addr_end_debug: out std_logic_vector(31 downto 0);
@@ -134,8 +134,7 @@ function extract_pmpcfg_in_field(
         return '0';
     end case;
   end function;
-
-
+signal exception_pmp2 : std_logic;
 --signal access_type_datamem : std_logic_vector(1 downto 0); 
 --signal data_we_pmp_int :std_logic;
 
@@ -153,11 +152,10 @@ process (pmpcfg_in, pmpaddr_in, data_addr_o, data_we_o, instr_addr_o,data_gnt_ef
    
 
 begin
-      set_except_condition_pmp <= set_except_condition;
+      set_except_condition_pmp <=set_except_condition;
       taken_branch_pmp <= taken_branch;
 
-
-
+exception_pmp <= '0';
     ie_except_data_pmp <= ie_except_data;
     IE_except_condition_pmp <= IE_except_condition;
     ie_taken_branch_pmp <= ie_taken_branch;
@@ -282,13 +280,14 @@ for i in 0 to PMP_REGIONS-1 loop
        if instr_addr_o <= std_logic_vector(addr_end) then
          access_valid_found_instr:= '1'; -- Accesso valido trovato
           if check_permissions(pmpcfg_in_field , "10") = '0' then
-                  instr_gnt_pmp<='0';
-                  ie_taken_branch_pmp <= '1';
-                  IE_except_condition_pmp <= '1';
-                   set_except_condition_pmp <= '1';
-                   taken_branch_pmp <= '1';
-                  ie_except_data_pmp <= ILLEGAL_INSN_EXCEPT_CODE;
-                  --instr_addr_pmp<= x"00000013";
+                  --instr_gnt_pmp<='0';
+                  exception_pmp<= '1';
+                  --ie_taken_branch_pmp <= '1';
+                  --IE_except_condition_pmp <= '1';
+                   --set_except_condition_pmp <= '1';
+                   --taken_branch_pmp <= '1';
+                  --ie_except_data_pmp <= ILLEGAL_INSN_EXCEPT_CODE;
+                 -- instr_addr_pmp<= x"00000013";
           end if;
           exit;
        end if;   
@@ -316,6 +315,18 @@ end loop;
 
   end process;
 
+--process(clk_i,rst_ni)
+--begin
 
+--if rst_ni ='0' then
+   --exception_pmp <= '0';
+  -- exception_pmp <= '0';
+--elsif rising_edge(clk_i) then
+--exception_pmp <= '0';
+--if exception_pmp2 ='1' then
+    --             exception_pmp <= '1';
+  --end if;
+  --end if;
+--end process;
 
 end RTL;

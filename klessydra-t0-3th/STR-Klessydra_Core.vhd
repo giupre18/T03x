@@ -259,6 +259,7 @@ signal instr_addr_pmp : std_logic_vector (31 downto 0);
 signal data_addr_pmp_internal :std_logic_vector(31 downto 0);
 signal data_addr_pipe_internal :std_logic_vector(31 downto 0);
 
+signal exception_pmp : std_logic;
 
  signal ie_except_data_pmp           :  std_logic_vector(31 downto 0);
  signal   IE_except_condition_pmp       :  std_logic;
@@ -428,6 +429,7 @@ signal taken_branch_pmp : std_logic;
     --TPS_CEIL                   : natural
     );
   port (
+     exception_pmp : in std_logic;
     pc_IF                      : in  std_logic_vector(31 downto 0);
     harc_IF                    : in  harc_range;
     irq_pending                : in  std_logic_vector(harc_range);
@@ -549,6 +551,7 @@ signal taken_branch_pmp : std_logic;
 
     set_except_condition_pmp          : out std_logic;
     taken_branch_pmp                  : out std_logic;
+      exception_pmp : out std_logic;
 
   -- segnali di debug
     addr_start_debug: out std_logic_vector(31 downto 0);
@@ -647,7 +650,7 @@ begin
       irq_i                       => irq_i,
       fetch_enable_i              => fetch_enable_i,
       boot_addr_i                 => boot_addr_i,
-      instr_gnt_i                 => instr_gnt_pmp
+      instr_gnt_i                 => instr_gnt_i
       );
 
   CSR : CSR_Unit
@@ -736,6 +739,7 @@ begin
       --TPS_CEIL                => TPS_CEIL
       )
     port map(
+      exception_pmp => exception_pmp,
       pc_IF                      => pc_IF,
       harc_IF                    => harc_IF,
       irq_pending                => irq_pending,
@@ -848,6 +852,7 @@ begin
 
     set_except_condition_pmp          =>set_except_condition_pmp,
     taken_branch_pmp                  =>    taken_branch_pmp,
+     exception_pmp => exception_pmp,
 
 
     --PMP Registers Inputs
