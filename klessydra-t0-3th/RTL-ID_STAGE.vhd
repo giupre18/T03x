@@ -33,8 +33,8 @@ entity ID_STAGE is
     RF_CEIL                    : natural
     );
   port (
-    exception_pmp_decode             : in std_logic;
-    exception_pmp_exe              : out std_logic;
+   -- exception_pmp_decode             : in std_logic;
+    --exception_pmp_exe              : out std_logic;
   -- Branch Control Signals
     comparator_en              : out std_logic;
     ls_instr_req               : out std_logic;
@@ -208,7 +208,7 @@ begin
       WB_EN_next_ID       <= '0';
     elsif rising_edge(clk_i) then
       
-    exception_pmp_exe <= exception_pmp_decode;
+    --exception_pmp_exe <= exception_pmp_decode;
       ls_instr_req     <= '0';
       ie_instr_req     <= '0';
       WB_EN_next_ID    <= '0'; 

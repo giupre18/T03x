@@ -26,8 +26,8 @@ entity IF_STAGE is
     RF_CEIL                    : natural
     );
   port(
-    exception_pmp_fetch              : in  std_logic;
-    exception_pmp_decode             : out std_logic;
+    --exception_pmp_fetch              : in  std_logic;
+    --exception_pmp_decode             : out std_logic;
     pc_IF                      : in  std_logic_vector(31 downto 0);
     busy_ID                    : in  std_logic;
     instr_rvalid_i             : in  std_logic;
@@ -106,15 +106,13 @@ begin
 ----------------------------------------------------------------------------------------------------
 
 
-  
+    
 instr_req_o <= not busy_ID;
   process(clk_i, rst_ni)
   begin
     if rising_edge(clk_i) then
-    exception_pmp_decode<= exception_pmp_fetch;
-    if exception_pmp_fetch ='1' then
-       exception_pmp_busy <='1';
-       end if;
+ -- exception_pmp_decode<= exception_pmp_fetch;
+    
       if instr_gnt_i = '1' then
         pc_ID   <= pc_IF;
         harc_ID <= harc_IF;

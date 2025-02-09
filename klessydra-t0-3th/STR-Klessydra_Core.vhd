@@ -583,7 +583,7 @@ begin
 
   assert (lutram_rf /= debug_en and lutram_rf /= 1) report "Debug-Unit cannot read from a LUTRAM regfile." severity WARNING;
 
-  instr_addr_o <= instr_addr_pmp;
+  instr_addr_o <= pc_IF;
 
   process(pc_except_value, set_except_condition, pc_IE, pc_except_value_wire, harc_EXEC) --VHDL1993
   begin
@@ -833,7 +833,7 @@ begin
     data_addr_pmp     => data_addr_pmp_internal,
     data_addr_o              => data_addr_pipe_internal,
   -- program memory interface
-    instr_addr_o                    =>  pc_IF,
+    instr_addr_o                    =>  pc_IE,
     instr_addr_pmp => instr_addr_pmp,
     instr_pmpvalid_o => instr_pmpvalid_internal,
     

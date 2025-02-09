@@ -134,7 +134,6 @@ function extract_pmpcfg_in_field(
         return '0';
     end case;
   end function;
-signal exception_pmp2 : std_logic;
 --signal access_type_datamem : std_logic_vector(1 downto 0); 
 --signal data_we_pmp_int :std_logic;
 
@@ -155,7 +154,7 @@ begin
       set_except_condition_pmp <=set_except_condition;
       taken_branch_pmp <= taken_branch;
 
-exception_pmp <= '0';
+ exception_pmp <= '0';
     ie_except_data_pmp <= ie_except_data;
     IE_except_condition_pmp <= IE_except_condition;
     ie_taken_branch_pmp <= ie_taken_branch;
@@ -282,7 +281,8 @@ for i in 0 to PMP_REGIONS-1 loop
           if check_permissions(pmpcfg_in_field , "10") = '0' then
                   --instr_gnt_pmp<='0';
                   exception_pmp<= '1';
-                  --ie_taken_branch_pmp <= '1';
+
+                                    --ie_taken_branch_pmp <= '1';
                   --IE_except_condition_pmp <= '1';
                    --set_except_condition_pmp <= '1';
                    --taken_branch_pmp <= '1';
