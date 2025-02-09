@@ -42,6 +42,8 @@ entity Pipeline is
     RF_CEIL                    : natural
   );
   port (
+    store_exception_pmp :  in std_logic;
+    load_exception_pmp :  in std_logic;
     exception_pmp                   : in std_logic;
     pc_IF                      : in  std_logic_vector(31 downto 0);
     harc_IF                    : in  natural range THREAD_POOL_SIZE-1 downto 0;
@@ -418,6 +420,8 @@ architecture Pipe of Pipeline is
       THREAD_POOL_SIZE          : natural
       );
   port (
+        store_exception_pmp :  in std_logic;
+        load_exception_pmp :  in std_logic;
     -- clock, and reset active low
     clk_i, rst_ni              : in std_logic;
     -- Program Counter Signals
@@ -774,6 +778,8 @@ begin
     THREAD_POOL_SIZE           => THREAD_POOL_SIZE
     )
   port map(
+            store_exception_pmp =>     store_exception_pmp,
+        load_exception_pmp =>     load_exception_pmp,
     clk_i                      => clk_i,
     rst_ni                     => rst_ni,    
     irq_pending                => irq_pending,
@@ -795,7 +801,7 @@ begin
     halt_LSU                   => halt_LSU,
     data_addr_internal         => data_addr_internal, 
     ls_except_data             => ls_except_data,  
-    ls_except_condition        => ls_except_condition,        
+    ls_except_condition        => ls_except_condition_int,        
     ls_taken_branch            => ls_taken_branch_int,
     amo_load                   => amo_load,              
     amo_load_skip              => amo_load_skip,         

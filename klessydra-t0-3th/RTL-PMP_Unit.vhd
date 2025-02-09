@@ -24,6 +24,8 @@ entity PMP_Unit is
 
     data_gnt_pmp             :out std_logic;
     data_gnt_effettivo       : in std_logic;
+    load_exception_pmp : out std_logic;
+    store_exception_pmp : out std_logic;
 
   -- program memory interface
     instr_addr_o	       : in std_logic_vector(31 downto 0);
@@ -153,7 +155,8 @@ process (pmpcfg_in, pmpaddr_in, data_addr_o, data_we_o, instr_addr_o,data_gnt_ef
 begin
       set_except_condition_pmp <=set_except_condition;
       taken_branch_pmp <= taken_branch;
-
+                        store_exception_pmp <= '0';
+                  load_exception_pmp <= '0';
  exception_pmp <= '0';
     ie_except_data_pmp <= ie_except_data;
     IE_except_condition_pmp <= IE_except_condition;
@@ -217,10 +220,17 @@ for i in 0 to PMP_REGIONS-1 loop
       if data_addr_o >= std_logic_vector(addr_start) then
        	if data_addr_o <= std_logic_vector(addr_end) then
            access_valid_found := '1'; -- Accesso valido trovato
-    	    if check_permissions(pmpcfg_in_field , "01") = '0' or check_permissions(pmpcfg_in_field , "00") = '0' then
-                  data_gnt_pmp<='0';
-                  data_we_pmp <= '0';
-                  data_addr_pmp<=(others => '0');
+    	    if check_permissions(pmpcfg_in_field , "00") = '0' then
+                  --data_gnt_pmp<='0';
+                  --data_we_pmp <= '0';
+                  --data_addr_pmp<=(others => '0');
+                  load_exception_pmp <= '1';
+          end if;
+          if check_permissions(pmpcfg_in_field , "01") = '0' then
+                  --data_gnt_pmp<='0';
+                  --data_we_pmp <= '0';
+                  --data_addr_pmp<=(others => '0');
+                  store_exception_pmp <= '1';
           end if;
         exit;
         end if;  

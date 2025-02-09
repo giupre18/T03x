@@ -260,7 +260,8 @@ signal data_addr_pmp_internal :std_logic_vector(31 downto 0);
 signal data_addr_pipe_internal :std_logic_vector(31 downto 0);
 
 signal exception_pmp : std_logic;
-
+signal  load_exception_pmp :  std_logic;
+signal  store_exception_pmp :  std_logic;
  signal ie_except_data_pmp           :  std_logic_vector(31 downto 0);
  signal   IE_except_condition_pmp       :  std_logic;
  signal   ie_taken_branch_pmp           :  std_logic; 
@@ -429,6 +430,8 @@ signal taken_branch_pmp : std_logic;
     --TPS_CEIL                   : natural
     );
   port (
+                store_exception_pmp : in std_logic;
+            load_exception_pmp : in std_logic;
      exception_pmp : in std_logic;
     pc_IF                      : in  std_logic_vector(31 downto 0);
     harc_IF                    : in  harc_range;
@@ -529,6 +532,8 @@ signal taken_branch_pmp : std_logic;
 
     data_gnt_pmp             :out std_logic;
     data_gnt_effettivo       : in std_logic;
+        load_exception_pmp : out std_logic;
+        store_exception_pmp : out std_logic;
   -- program memory interface
     instr_addr_o         : in std_logic_vector(31 downto 0);
     instr_addr_pmp       :out std_logic_vector(31 downto 0);
@@ -739,6 +744,8 @@ begin
       --TPS_CEIL                => TPS_CEIL
       )
     port map(
+                    store_exception_pmp =>     store_exception_pmp ,
+              load_exception_pmp =>     load_exception_pmp ,
       exception_pmp => exception_pmp,
       pc_IF                      => pc_IF,
       harc_IF                    => harc_IF,
@@ -832,6 +839,8 @@ begin
 
     data_addr_pmp     => data_addr_pmp_internal,
     data_addr_o              => data_addr_pipe_internal,
+        load_exception_pmp =>     load_exception_pmp ,
+                store_exception_pmp =>     store_exception_pmp ,
   -- program memory interface
     instr_addr_o                    =>  pc_IE,
     instr_addr_pmp => instr_addr_pmp,

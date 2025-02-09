@@ -26,6 +26,8 @@ entity Load_Store_Unit is
     THREAD_POOL_SIZE           : natural
     );
   port (
+            store_exception_pmp :  in std_logic;
+        load_exception_pmp :  in std_logic;
     -- clock, and reset active low
     clk_i, rst_ni              : in  std_logic;
     -- Program Counter Signals
@@ -115,9 +117,8 @@ architecture LSU of Load_Store_Unit is
   signal LS_WB_EN_int               : std_logic;
   signal amo_store_int              : std_logic;
   signal state_LS_int               : fsm_LS_states;
-
- 
-
+  signal load_err_primario          : std_logic; 
+  signal store_err_primario          : std_logic; 
 begin
 
   data_we_o <= data_we_o_int;
@@ -130,8 +131,10 @@ begin
   state_LS <= state_LS_int;
 
   -- Memory fault signals
-  load_err  <= data_gnt_i and data_err_i and not(data_we_o_int);
-  store_err <= data_gnt_i and data_err_i and data_we_o_int;
+  load_err_primario  <= data_gnt_i and data_err_i and not(data_we_o_int);
+  load_err <= load_err_primario or load_exception_pmp;
+  store_err_primario <= data_gnt_i and data_err_i and data_we_o_int;
+  store_err <= store_err_primario or store_exception_pmp;
 
 
   -- Memory address signal
