@@ -32,9 +32,11 @@ entity Program_Counter is
     absolute_address                  : in  std_logic_vector(31 downto 0);
     PC_offset                         : in  std_logic_vector(31 downto 0);
     taken_branch                      : in  std_logic;
+    fetch_taken_branch                   : in  std_logic;
     ie_taken_branch                   : in  std_logic;
     ls_taken_branch                   : in  std_logic;
     set_branch_condition              : in  std_logic;
+    fetch_except_condition               : in  std_logic;
     ie_except_condition               : in  std_logic;
     ls_except_condition               : in  std_logic;
     set_except_condition              : in  std_logic;
@@ -50,6 +52,7 @@ entity Program_Counter is
     instr_word_IE                     : in  std_logic_vector(31 downto 0);
     pc_IF                             : out std_logic_vector(31 downto 0);
     harc_IF                           : out natural range THREAD_POOL_SIZE-1 downto 0;
+    served_fetch_except_condition        : out std_logic_vector(THREAD_POOL_SIZE-1 downto 0);
     served_ie_except_condition        : out std_logic_vector(THREAD_POOL_SIZE-1 downto 0);
     served_ls_except_condition        : out std_logic_vector(THREAD_POOL_SIZE-1 downto 0);
     served_except_condition           : out std_logic_vector(THREAD_POOL_SIZE-1 downto 0);
@@ -81,6 +84,7 @@ architecture PC of Program_counter is
   signal taken_branch_replicated               : std_logic_vector(harc_range);
   signal ls_except_condition_replicated        : std_logic_vector(harc_range);
   signal ie_except_condition_replicated        : std_logic_vector(harc_range);
+  signal fetch_except_condition_replicated        : std_logic_vector(harc_range);
   signal set_except_condition_replicated       : std_logic_vector(harc_range);
   signal set_trap_condition_replicated         : std_logic_vector(harc_range);
   signal set_mret_condition_replicated         : std_logic_vector(harc_range);
@@ -103,6 +107,7 @@ architecture PC of Program_counter is
 
   signal taken_branch_pc_pending_internal_lat  : harc_vec_array;
   signal taken_branch_pending_internal_lat     : std_logic_vector(harc_range);
+  signal served_fetch_except_condition_lat        : std_logic_vector(harc_range);
   signal served_ie_except_condition_lat        : std_logic_vector(harc_range);
   signal served_ls_except_condition_lat        : std_logic_vector(harc_range);
   signal served_except_condition_lat           : std_logic_vector(harc_range);
@@ -111,6 +116,7 @@ architecture PC of Program_counter is
   signal halt_en                               : std_logic_vector(harc_range);
 
   -- Internal signals (VHDL1993)
+  signal served_fetch_except_condition_int        : std_logic_vector(harc_range);
   signal served_ie_except_condition_int        : std_logic_vector(harc_range);
   signal served_ls_except_condition_int        : std_logic_vector(harc_range);
   signal served_except_condition_int           : std_logic_vector(harc_range);
@@ -129,6 +135,7 @@ architecture PC of Program_counter is
     signal taken_branch_pending          : inout std_logic;
     signal taken_branch_pending_lat      : in    std_logic;
     signal irq_pending                   : in    std_logic;
+    signal fetch_except_condition           : in    std_logic;
     signal ie_except_condition           : in    std_logic;
     signal ls_except_condition           : in    std_logic;
     signal set_except_condition          : in    std_logic;
@@ -139,6 +146,7 @@ architecture PC of Program_counter is
     signal taken_branch_pc_pending_lat   : in    std_logic_vector(31 downto 0);
     signal incremented_pc                : in    std_logic_vector(31 downto 0);
     signal pc_update_enable              : in    std_logic;
+    signal served_fetch_except_condition    : out   std_logic;
     signal served_ie_except_condition    : out   std_logic;
     signal served_ls_except_condition    : out   std_logic;
     signal served_except_condition       : out   std_logic;
@@ -149,6 +157,7 @@ architecture PC of Program_counter is
          set_branch_condition_ID = '1' then
         pc                          <= taken_branch_addr;
         taken_branch_pending        <= '0';
+        served_fetch_except_condition  <= fetch_except_condition;
         served_ie_except_condition  <= ie_except_condition;
         served_ls_except_condition  <= ls_except_condition;
         served_except_condition     <= set_except_condition;
@@ -156,6 +165,7 @@ architecture PC of Program_counter is
       elsif taken_branch_pending_lat = '1' then
         pc                          <= taken_branch_pc_pending_lat;
         taken_branch_pending        <= '0';
+        served_fetch_except_condition  <= fetch_except_condition;
         served_ie_except_condition  <= ie_except_condition;
         served_ls_except_condition  <= ls_except_condition;
         served_except_condition     <= set_except_condition;
@@ -163,6 +173,7 @@ architecture PC of Program_counter is
       else
         pc                          <= incremented_pc;
         served_except_condition     <= '0';
+        served_fetch_except_condition  <= '0';
         served_ie_except_condition  <= '0';
         served_ls_except_condition  <= '0';
         served_mret_condition       <= '0';
@@ -180,6 +191,8 @@ architecture PC of Program_counter is
         served_ls_except_condition <= '1';
       elsif ie_except_condition = '1' then
         served_ie_except_condition <= '1';
+      elsif fetch_except_condition = '1' then
+        served_fetch_except_condition <= '1';
       end if;
     end if;
   end pc_update;
@@ -193,6 +206,7 @@ begin
   irq_pending              <= irq_pending_internal;
 
   -- Connecting internal signals to ports
+  served_fetch_except_condition <= served_fetch_except_condition_int;
   served_ie_except_condition <= served_ie_except_condition_int;
   served_ls_except_condition <= served_ls_except_condition_int;
   served_except_condition <= served_except_condition_int;
@@ -226,12 +240,15 @@ begin
 
     taken_branch_replicated(h) <= '1' when ls_taken_branch  = '1' and (harc_EXEC = h)
 	                                   else '1' when ie_taken_branch  = '1' and (harc_EXEC = h)
+                                     else '1' when fetch_taken_branch  = '1' and (harc_EXEC = h)
                                      else '0';
     ls_except_condition_replicated(h)  <= '1' when ls_except_condition = '1' and (harc_EXEC = h)
                                      else '0';
     ie_except_condition_replicated(h)  <= '1' when ie_except_condition = '1' and (harc_EXEC = h)
                                      else '0';
-    set_except_condition_replicated(h) <= '1' when ls_except_condition_replicated(h) = '1' or ie_except_condition_replicated(h) = '1'
+    fetch_except_condition_replicated(h)  <= '1' when fetch_except_condition = '1' and (harc_EXEC = h)
+                                     else '0';
+    set_except_condition_replicated(h) <= '1' when ls_except_condition_replicated(h) = '1' or ie_except_condition_replicated(h) = '1'or fetch_except_condition_replicated(h) = '1'
                                      else '0'; -- replicated so that only one hart serves the exception and not more
     -- the abscence of the replicated singals below will create a problem with set_branch_condition_ID_replicated
     set_branch_condition_replicated(h) <= '1' when set_branch_condition = '1' and (harc_EXEC = h)
@@ -266,6 +283,7 @@ begin
       if rst_ni = '0' then 
         reset_state                          <= (others => '1');
         taken_branch_pending_internal_lat(h) <= '0';
+        served_fetch_except_condition_lat(h)    <= '0';
         served_ie_except_condition_lat(h)    <= '0';
         served_ls_except_condition_lat(h)    <= '0';
         served_except_condition_lat(h)       <= '0';
@@ -280,6 +298,7 @@ begin
         pc(h)                                   <= pc_wire(h);
         taken_branch_pc_pending_internal_lat(h) <= taken_branch_pc_pending_internal(h);
         taken_branch_pending_internal_lat(h)    <= taken_branch_pending_internal(h);
+        served_fetch_except_condition_lat(h)       <= served_fetch_except_condition_int(h);
         served_ie_except_condition_lat(h)       <= served_ie_except_condition_int(h);
         served_ls_except_condition_lat(h)       <= served_ls_except_condition_int(h);
         served_except_condition_lat(h)          <= served_except_condition_int(h);
@@ -290,11 +309,11 @@ begin
 
 --    pc_updater_comb : process()
     pc_updater_comb : process(
-                              pc(h), taken_branch_pc_pending_internal_lat(h), taken_branch_pending_internal_lat(h), served_ie_except_condition_lat(h),
+                              pc(h), taken_branch_pc_pending_internal_lat(h), taken_branch_pending_internal_lat(h), served_ie_except_condition_lat(h),served_fetch_except_condition_lat(h),
                               served_ls_except_condition_lat(h), served_except_condition_lat(h), served_mret_condition_lat(h), reset_state(h),
                               fetch_enable_i, MTVEC(h), instr_gnt_i, taken_branch_replicated(h), set_branch_condition_ID_replicated(h),
                               set_wfi_condition, taken_branch_pending_internal(h), irq_pending_internal(h),
-                              ie_except_condition_replicated(h), ls_except_condition_replicated(h), set_except_condition_replicated(h), set_mret_condition_replicated(h), 
+                              ie_except_condition_replicated(h),fetch_except_condition_replicated(h), ls_except_condition_replicated(h), set_except_condition_replicated(h), set_mret_condition_replicated(h), 
                               pc_wire(h), taken_branch_addr_internal(h), taken_branch_pc_pending_internal(h),
                               incremented_pc_internal(h), pc_update_enable(h)
                              ) --VHDL1993
@@ -302,6 +321,7 @@ begin
       pc_wire(h)                          <= pc(h);
       taken_branch_pc_pending_internal(h) <= taken_branch_pc_pending_internal_lat(h);
       taken_branch_pending_internal(h)    <= taken_branch_pending_internal_lat(h);
+      served_fetch_except_condition_int(h)       <= served_fetch_except_condition_lat(h);
       served_ie_except_condition_int(h)       <= served_ie_except_condition_lat(h);
       served_ls_except_condition_int(h)       <= served_ls_except_condition_lat(h);
       served_except_condition_int(h)          <= served_except_condition_lat(h);
@@ -316,7 +336,7 @@ begin
           set_wfi_condition,
           taken_branch_pending_internal(h), 
           taken_branch_pending_internal_lat(h),
-          irq_pending_internal(h),
+          irq_pending_internal(h),fetch_except_condition_replicated(h),
           ie_except_condition_replicated(h),
           ls_except_condition_replicated(h), 
           set_except_condition_replicated(h), 
@@ -326,7 +346,7 @@ begin
           taken_branch_pc_pending_internal(h),
           taken_branch_pc_pending_internal_lat(h), 
           incremented_pc_internal(h), 
-          pc_update_enable(h), 
+          pc_update_enable(h),served_fetch_except_condition_int(h), 
           served_ie_except_condition_int(h), 
           served_ls_except_condition_int(h),
           served_except_condition_int(h), 

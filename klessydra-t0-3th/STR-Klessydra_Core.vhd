@@ -180,6 +180,7 @@ architecture Klessydra_M of klessydra_t0_3th_core is
   -- pc updater signals
   signal served_ie_except_condition      : std_logic_vector(harc_range);
   signal served_ls_except_condition      : std_logic_vector(harc_range);
+  signal served_fetch_except_condition      : std_logic_vector(harc_range);
   signal served_except_condition         : std_logic_vector(harc_range);
   signal served_mret_condition           : std_logic_vector(harc_range);
   signal served_irq                      : std_logic_vector(harc_range);
@@ -187,12 +188,15 @@ architecture Klessydra_M of klessydra_t0_3th_core is
   signal taken_branch_pending            : std_logic_vector(harc_range);
   signal ie_except_data                  : std_logic_vector(31 downto 0);
   signal ls_except_data                  : std_logic_vector(31 downto 0);
+  signal fetch_except_data                  : std_logic_vector(31 downto 0);
   signal taken_branch                    : std_logic;
   signal ie_taken_branch                 : std_logic;
   signal ls_taken_branch                 : std_logic;
+  signal fetch_taken_branch                 : std_logic;
   signal set_branch_condition            : std_logic;
   signal ie_except_condition             : std_logic;
   signal ls_except_condition             : std_logic;
+  signal fetch_except_condition             : std_logic;
   signal set_except_condition            : std_logic;
   signal set_mret_condition              : std_logic;
   signal absolute_address                : std_logic_vector(31 downto 0);
@@ -307,9 +311,11 @@ signal taken_branch_pmp : std_logic;
     taken_branch                      : in  std_logic;
     ie_taken_branch                   : in  std_logic;
     ls_taken_branch                   : in  std_logic;
+    fetch_taken_branch                   : in  std_logic;
     set_branch_condition              : in  std_logic;
     ie_except_condition               : in  std_logic;
     ls_except_condition               : in  std_logic;
+    fetch_except_condition               : in  std_logic;
     set_except_condition              : in  std_logic;
     set_mret_condition                : in  std_logic;
     set_wfi_condition                 : in  std_logic;
@@ -323,6 +329,7 @@ signal taken_branch_pmp : std_logic;
     instr_word_IE                     : in  std_logic_vector(31 downto 0);
     pc_IF                             : out std_logic_vector(31 downto 0);
     harc_IF                           : out harc_range;
+    served_fetch_except_condition        : out std_logic_vector(harc_range);
     served_ie_except_condition        : out std_logic_vector(harc_range);
     served_ls_except_condition        : out std_logic_vector(harc_range);
     served_except_condition           : out std_logic_vector(harc_range);
@@ -356,8 +363,10 @@ signal taken_branch_pmp : std_logic;
   );
   port (
     pc_IE                       : in  std_logic_vector(31 downto 0);
+    fetch_except_data              : in  std_logic_vector(31 downto 0);
     ie_except_data              : in  std_logic_vector(31 downto 0);
     ls_except_data              : in  std_logic_vector(31 downto 0);
+    served_fetch_except_condition  : in  std_logic_vector(harc_range);
     served_ie_except_condition  : in  std_logic_vector(harc_range);
     served_ls_except_condition  : in  std_logic_vector(harc_range);
     harc_EXEC                   : in  natural range THREAD_POOL_SIZE-1 downto 0;
@@ -430,6 +439,9 @@ signal taken_branch_pmp : std_logic;
     --TPS_CEIL                   : natural
     );
   port (
+        fetch_taken_branch            : out std_logic;
+    fetch_except_condition        : out std_logic;
+    fetch_except_data             : out std_logic_vector(31 downto 0);  
                 store_exception_pmp : in std_logic;
             load_exception_pmp : in std_logic;
      exception_pmp : in std_logic;
@@ -618,13 +630,15 @@ begin
       data_we_o_lat               => data_we_o_lat,
       absolute_address            => absolute_address,       
       PC_offset                   => PC_offset,
-      taken_branch                => taken_branch_pmp,
-      ie_taken_branch             => ie_taken_branch_pmp,
+      taken_branch                => taken_branch,
+      fetch_taken_branch             => fetch_taken_branch,
+      ie_taken_branch             => ie_taken_branch,
       ls_taken_branch             => ls_taken_branch,
       set_branch_condition        => set_branch_condition,
-      ie_except_condition         => ie_except_condition_pmp,
+      fetch_except_condition         => fetch_except_condition,
+      ie_except_condition         => ie_except_condition,
       ls_except_condition         => ls_except_condition,
-      set_except_condition        => set_except_condition_pmp,
+      set_except_condition        => set_except_condition,
       set_mret_condition          => set_mret_condition,
       set_wfi_condition           => set_wfi_condition,
       harc_ID                     => harc_ID,
@@ -640,6 +654,7 @@ begin
       instr_word_IE               => instr_word_IE,
       pc_IF                       => pc_IF,
       harc_IF                     => harc_IF,
+      served_fetch_except_condition  => served_fetch_except_condition,
       served_ie_except_condition  => served_ie_except_condition,
       served_ls_except_condition  => served_ls_except_condition,
       served_except_condition     => served_except_condition,
@@ -672,8 +687,10 @@ begin
     )
     port map(
       pc_IE                       => pc_IE,
-      ie_except_data              => ie_except_data_pmp,
+      fetch_except_data        => fetch_except_data,
+      ie_except_data              => ie_except_data,
       ls_except_data              => ls_except_data,
+      served_fetch_except_condition  => served_fetch_except_condition,
       served_ie_except_condition  => served_ie_except_condition,
       served_ls_except_condition  => served_ls_except_condition,
       harc_EXEC                   => harc_EXEC,
@@ -744,6 +761,9 @@ begin
       --TPS_CEIL                => TPS_CEIL
       )
     port map(
+          fetch_taken_branch            =>fetch_taken_branch,
+    fetch_except_condition        => fetch_except_condition,
+    fetch_except_data             =>  fetch_except_data,
                     store_exception_pmp =>     store_exception_pmp ,
               load_exception_pmp =>     load_exception_pmp ,
       exception_pmp => exception_pmp,

@@ -40,8 +40,10 @@ entity CSR_Unit is
   );
   port (
     pc_IE                       : in  std_logic_vector(31 downto 0);
+    fetch_except_data              : in  std_logic_vector(31 downto 0);
     ie_except_data              : in  std_logic_vector(31 downto 0);
     ls_except_data              : in  std_logic_vector(31 downto 0);
+    served_fetch_except_condition  : in  std_logic_vector(THREAD_POOL_SIZE-1 downto 0);
     served_ie_except_condition  : in  std_logic_vector(THREAD_POOL_SIZE-1 downto 0);
     served_ls_except_condition  : in  std_logic_vector(THREAD_POOL_SIZE-1 downto 0);
     harc_EXEC                   : in  natural range THREAD_POOL_SIZE-1 downto 0;
@@ -149,6 +151,7 @@ architecture CSR of CSR_Unit is
   signal irq_ack_o_internal     : std_logic;
   signal trap_hndlr             : std_logic_vector(harc_range);
 
+  signal served_fetch_except_condition_lat  : std_logic_vector(harc_range);
   signal served_ie_except_condition_lat  : std_logic_vector(harc_range);
   signal served_ls_except_condition_lat  : std_logic_vector(harc_range);
   signal served_except_condition_lat     : std_logic_vector(harc_range);
@@ -286,6 +289,7 @@ begin
           PCER_int(h)                           <= PCER_RESET_VALUE;
         end if;
         MIP_internal(h)                     <= MIP_RESET_VALUE;
+        served_fetch_except_condition_lat(h)   <= '0'; 
         served_ie_except_condition_lat(h)   <= '0'; 
         served_ls_except_condition_lat(h)   <= '0'; 
         served_except_condition_lat(h)      <= '0';
@@ -300,7 +304,7 @@ begin
         
         pmpaddr_internal(4 to pmpaddr_internal'length-1) := (others => (others => '0'));
 
-        pmpcfg_internal(0)        := x"8F8F8D8F";
+        pmpcfg_internal(0)        := x"8F8F8B8F";
         pmpcfg_internal(1 to pmpcfg_internal'length-1) := (others => (others => '0'));
    
       elsif rising_edge(clk_i) then
@@ -323,6 +327,7 @@ begin
         --  ██║██║  ██║╚██████╔╝██╔╝   ███████╗██╔╝ ██╗╚██████╗███████╗██║        ██║       ██║  ██║██║  ██║██║ ╚████║██████╔╝███████╗███████╗██║  ██║  --
         --  ╚═╝╚═╝  ╚═╝ ╚══▀▀═╝ ╚═╝    ╚══════╝╚═╝  ╚═╝ ╚═════╝╚══════╝╚═╝        ╚═╝       ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═══╝╚═════╝ ╚══════╝╚══════╝╚═╝  ╚═╝  --
         --------------------------------------------------------------------------------------------------------------------------------------------------
+        served_fetch_except_condition_lat(h)   <= served_fetch_except_condition(h);
         served_ie_except_condition_lat(h)   <= served_ie_except_condition(h);
         served_ls_except_condition_lat(h)   <= served_ls_except_condition(h);
         served_except_condition_lat(h)      <= served_except_condition(h);
@@ -405,6 +410,8 @@ begin
             MCAUSE_internal(h)     <= ls_except_data;  -- passed from LS unit
           elsif served_ie_except_condition_lat(h) = '1' then
             MCAUSE_internal(h)     <= ie_except_data;  -- passed from IE Stage
+            elsif served_fetch_except_condition_lat(h) = '1' then
+            MCAUSE_internal(h)     <= fetch_except_data;  -- passed from IF Stage
           end if;
           MESTATUS(h)(2 downto 1)        <= MSTATUS_internal(h);
           MEPC_internal(h)   <= pc_except_value_wire(h);

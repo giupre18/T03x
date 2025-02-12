@@ -26,7 +26,10 @@ entity IF_STAGE is
     RF_CEIL                    : natural
     );
   port(
-    --exception_pmp_fetch              : in  std_logic;
+    fetch_taken_branch            : out std_logic;
+    fetch_except_condition        : out std_logic;
+    fetch_except_data             : out std_logic_vector(31 downto 0);   
+    exception_pmp_fetch           : in  std_logic;
     --exception_pmp_decode             : out std_logic;
     pc_IF                      : in  std_logic_vector(31 downto 0);
     busy_ID                    : in  std_logic;
@@ -111,7 +114,10 @@ instr_req_o <= not busy_ID;
   process(clk_i, rst_ni)
   begin
     if rising_edge(clk_i) then
- -- exception_pmp_decode<= exception_pmp_fetch;
+    if exception_pmp_fetch = '1' then
+     fetch_except_data <= ILLEGAL_INSN_EXCEPT_CODE;
+    end if;
+   
     
       if instr_gnt_i = '1' then
         pc_ID   <= pc_IF;
@@ -125,7 +131,21 @@ instr_req_o <= not busy_ID;
 
   instr_rvalid_ID <= instr_rvalid_i;
   instr_word_ID   <= instr_rdata_i when instr_rvalid_i = '1' else instr_word_ID_lat;
+  process(exception_pmp_fetch)
+  variable fetch_except_condition_wires        : std_logic;
+  variable fetch_taken_branch_wires            : std_logic;
 
+  begin 
+       fetch_except_condition_wires := '0';
+       fetch_taken_branch_wires  := '0';
+    if exception_pmp_fetch = '1' then  -- ILLEGAL_INSTRUCTION
+        fetch_except_condition_wires := '1';
+        fetch_taken_branch_wires  := '1';
+    end if;
+        fetch_taken_branch            <= fetch_taken_branch_wires;
+        fetch_except_condition        <= fetch_except_condition_wires;
+
+end process;
 --------------------------------------------------------------------- end of IF stage -------------
 ---------------------------------------------------------------------------------------------------
 

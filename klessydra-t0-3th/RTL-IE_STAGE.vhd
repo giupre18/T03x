@@ -31,7 +31,7 @@ entity IE_STAGE is
     RF_CEIL                   : natural
   );
   port (
-        exception_pmp_exe                  : in std_logic; 
+       -- exception_pmp_exe                  : in std_logic; 
   -- clock, and reset active low
     clk_i, rst_ni             : in  std_logic;
     instr_gnt_i               : in  std_logic;
@@ -189,7 +189,6 @@ architecture EXECUTE of IE_STAGE is
   signal MUL_WB_EN_wire_int         : std_logic;
   signal core_busy_IE_int           : std_logic;
   
-  signal exception_pmp_exe_int       :std_logic;
 
   function rs1 (signal instr : in std_logic_vector(31 downto 0)) return integer is
   begin
@@ -233,7 +232,7 @@ begin
   fsm_IE_sync : process(clk_i, rst_ni)
   begin
     if rst_ni = '0' then
-      exception_pmp_exe_int <= '0';
+      --exception_pmp_exe_int <= '0';
       IE_WB                  <= std_logic_vector(to_unsigned(0, 32));
       IE_WB_EN               <= '0';
       MUL_WB_EN              <= '0';
@@ -244,7 +243,7 @@ begin
       halt_update_IE         <= (others => '0');
       halt_update_IE_pending <= (others => '0');
     elsif rising_edge(clk_i) then
-exception_pmp_exe_int<= exception_pmp_exe;
+--exception_pmp_exe_int<= exception_pmp_exe;
     
     
       IE_WB_EN         <= '0';
@@ -385,7 +384,7 @@ exception_pmp_exe_int<= exception_pmp_exe;
               ie_except_data <= ECALL_EXCEPT_CODE;
             end if;
 
-            if decoded_instruction_IE(ILL_bit_position) = '1' or  exception_pmp_exe_int = '1' then
+            if decoded_instruction_IE(ILL_bit_position) = '1'  then
               ie_except_data <= ILLEGAL_INSN_EXCEPT_CODE;
             end if;
 
@@ -739,7 +738,7 @@ exception_pmp_exe_int<= exception_pmp_exe;
             end if;
           end if;
 
-          if decoded_instruction_IE(ILL_bit_position) = '1' or exception_pmp_exe_int = '1' then  -- ILLEGAL_INSTRUCTION
+          if decoded_instruction_IE(ILL_bit_position) = '1'  then  -- ILLEGAL_INSTRUCTION
             IE_except_condition_wires := '1';
             ie_taken_branch_wires     := '1';
           end if;

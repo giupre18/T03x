@@ -42,6 +42,9 @@ entity Pipeline is
     RF_CEIL                    : natural
   );
   port (
+    fetch_taken_branch            : out std_logic;
+    fetch_except_condition        : out std_logic;
+    fetch_except_data             : out std_logic_vector(31 downto 0); 
     store_exception_pmp :  in std_logic;
     load_exception_pmp :  in std_logic;
     exception_pmp                   : in std_logic;
@@ -280,6 +283,7 @@ architecture Pipe of Pipeline is
   signal harc_ID_int                 : natural range THREAD_POOL_SIZE-1 downto 0;
   signal ie_taken_branch_int         : std_logic;
   signal ls_taken_branch_int         : std_logic;
+  signal fetch_taken_branch_int         : std_logic;
   signal RS1_Data_IE_int             : std_logic_vector(31 downto 0);
   signal RS2_Data_IE_int             : std_logic_vector(31 downto 0);
   signal RD_Data_IE_int              : std_logic_vector(31 downto 0);
@@ -287,6 +291,7 @@ architecture Pipe of Pipeline is
   signal harc_exec_int               : natural range THREAD_POOL_SIZE-1 downto 0;
   signal ie_except_condition_int     : std_logic;
   signal ls_except_condition_int     : std_logic;
+  signal fetch_except_condition_int     : std_logic;
   signal taken_branch_int            : std_logic;
   signal set_except_condition_int    : std_logic;
   signal state_LS_int                : fsm_LS_states;
@@ -314,7 +319,10 @@ architecture Pipe of Pipeline is
     THREAD_POOL_SIZE           : natural
     );
   port (
-   -- exception_pmp_fetch              : in  std_logic;
+    fetch_taken_branch            : out std_logic;
+    fetch_except_condition        : out std_logic;
+    fetch_except_data             : out std_logic_vector(31 downto 0);  
+    exception_pmp_fetch              : in  std_logic;
    -- exception_pmp_decode             : out std_logic;
     pc_IF                      : in  std_logic_vector(31 downto 0);
     busy_ID                    : in  std_logic;  
@@ -482,7 +490,7 @@ architecture Pipe of Pipeline is
   );
   port (
 
-    exception_pmp_exe                  : in std_logic; 
+   -- exception_pmp_exe                  : in std_logic; 
      -- clock, and reset active low
     clk_i, rst_ni             : in  std_logic;
     instr_gnt_i               : in  std_logic;
@@ -625,6 +633,8 @@ begin
   harc_ID <= harc_ID_int;
   ie_taken_branch <= ie_taken_branch_int;
   ls_taken_branch <= ls_taken_branch_int;
+  fetch_taken_branch <= fetch_taken_branch_int;
+
   RS1_Data_IE <= RS1_Data_IE_int;
   RS2_Data_IE <= RS2_Data_IE_int;
   RD_Data_IE <= RD_Data_IE_int;
@@ -632,9 +642,11 @@ begin
   harc_exec <= harc_exec_int;
   ls_except_condition <= ls_except_condition_int;
   ie_except_condition <= ie_except_condition_int;
+  fetch_except_condition <= fetch_except_condition_int;
+
   set_except_condition <= set_except_condition_int;
   taken_branch <= taken_branch_int;
-
+ 
 
   -- Klessydra T13 (4 stages) pipeline implementation -----------------------
 
@@ -643,9 +655,9 @@ begin
     report "Threading configuration not supported"
   severity error;
 
-  set_except_condition_int <= '1' when (IE_except_condition_int = '1' or LS_except_condition_int = '1') else '0';
+  set_except_condition_int <= '1' when (IE_except_condition_int = '1' or LS_except_condition_int = '1' or fetch_except_condition_int = '1') else '0';
 
-  taken_branch_int <= '1' when (ie_taken_branch_int = '1' or ls_taken_branch_int = '1') else '0';
+  taken_branch_int <= '1' when (ie_taken_branch_int = '1' or ls_taken_branch_int = '1' or fetch_taken_branch_int ='1') else '0';
           
   csr_wdata_i <= ie_csr_wdata_i;
 
@@ -679,7 +691,10 @@ begin
     RF_CEIL                    => RF_CEIL
     )
   port map(
-    --exception_pmp_fetch             => exception_pmp_fetch,
+        fetch_taken_branch            => fetch_taken_branch_int,
+    fetch_except_condition        => fetch_except_condition_int,
+    fetch_except_data             =>  fetch_except_data,
+    exception_pmp_fetch             => exception_pmp,
     --exception_pmp_decode            => exception_pmp_decode,
     pc_IF                      => pc_IF,
     busy_ID                    => busy_ID,   
@@ -832,7 +847,7 @@ begin
     RF_CEIL                    => RF_CEIL
   )
   port map(
-        exception_pmp_exe               => exception_pmp,
+       -- exception_pmp_exe               => exception_pmp,
     clk_i                      => clk_i,
     rst_ni                     => rst_ni,
     instr_gnt_i                => instr_gnt_i,
