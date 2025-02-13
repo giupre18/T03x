@@ -862,7 +862,7 @@ begin
         load_exception_pmp =>     load_exception_pmp ,
                 store_exception_pmp =>     store_exception_pmp ,
   -- program memory interface
-    instr_addr_o                    =>  pc_IE,
+    instr_addr_o                    =>  pc_IF,
     instr_addr_pmp => instr_addr_pmp,
     instr_pmpvalid_o => instr_pmpvalid_internal,
     

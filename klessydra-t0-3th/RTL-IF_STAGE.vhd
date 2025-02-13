@@ -109,8 +109,7 @@ begin
 ----------------------------------------------------------------------------------------------------
 
 
-    
-instr_req_o <= not busy_ID;
+ instr_req_o <= not busy_ID ;   
   process(clk_i, rst_ni)
   begin
     if rising_edge(clk_i) then
@@ -119,18 +118,19 @@ instr_req_o <= not busy_ID;
     end if;
    
     
-      if instr_gnt_i = '1' then
+      if instr_gnt_i = '1'  and exception_pmp_fetch = '0' then
         pc_ID   <= pc_IF;
         harc_ID <= harc_IF;
       end if;
-      if instr_rvalid_i = '1' then 
+      if instr_rvalid_i = '1'  then 
         instr_word_ID_lat <= instr_rdata_i;
       end if;
     end if;
   end process;
 
+
   instr_rvalid_ID <= instr_rvalid_i;
-  instr_word_ID   <= instr_rdata_i when instr_rvalid_i = '1' else instr_word_ID_lat;
+  instr_word_ID   <= instr_rdata_i when instr_rvalid_i = '1'  else instr_word_ID_lat;
   process(exception_pmp_fetch)
   variable fetch_except_condition_wires        : std_logic;
   variable fetch_taken_branch_wires            : std_logic;

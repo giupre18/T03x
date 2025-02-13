@@ -240,13 +240,13 @@ begin
 
     taken_branch_replicated(h) <= '1' when ls_taken_branch  = '1' and (harc_EXEC = h)
 	                                   else '1' when ie_taken_branch  = '1' and (harc_EXEC = h)
-                                     else '1' when fetch_taken_branch  = '1' and (harc_EXEC = h)
+                                     else '1' when fetch_taken_branch  = '1' and (harc_IF_internal = h)
                                      else '0';
     ls_except_condition_replicated(h)  <= '1' when ls_except_condition = '1' and (harc_EXEC = h)
                                      else '0';
     ie_except_condition_replicated(h)  <= '1' when ie_except_condition = '1' and (harc_EXEC = h)
                                      else '0';
-    fetch_except_condition_replicated(h)  <= '1' when fetch_except_condition = '1' and (harc_EXEC = h)
+    fetch_except_condition_replicated(h)  <= '1' when fetch_except_condition = '1' and (harc_IF_internal = h)
                                      else '0';
     set_except_condition_replicated(h) <= '1' when ls_except_condition_replicated(h) = '1' or ie_except_condition_replicated(h) = '1'or fetch_except_condition_replicated(h) = '1'
                                      else '0'; -- replicated so that only one hart serves the exception and not more
