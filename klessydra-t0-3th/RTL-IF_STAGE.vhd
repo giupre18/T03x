@@ -114,7 +114,7 @@ begin
   begin
     if rising_edge(clk_i) then
     if exception_pmp_fetch = '1' then
-     fetch_except_data <= ILLEGAL_INSN_EXCEPT_CODE;
+     fetch_except_data <= INSTR_ACCESS_FAULT_CODE;
     end if;
    
     

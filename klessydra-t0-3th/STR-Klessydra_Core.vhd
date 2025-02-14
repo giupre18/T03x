@@ -362,6 +362,7 @@ signal taken_branch_pmp : std_logic;
     count_all                   : natural
   );
   port (
+    pc_IF                       : in  std_logic_vector(31 downto 0);
     pc_IE                       : in  std_logic_vector(31 downto 0);
     fetch_except_data              : in  std_logic_vector(31 downto 0);
     ie_except_data              : in  std_logic_vector(31 downto 0);
@@ -686,6 +687,7 @@ begin
       count_all                   => count_all
     )
     port map(
+      pc_IF                       => pc_IF,
       pc_IE                       => pc_IE,
       fetch_except_data        => fetch_except_data,
       ie_except_data              => ie_except_data,

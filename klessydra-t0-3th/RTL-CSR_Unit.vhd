@@ -39,6 +39,7 @@ entity CSR_Unit is
     count_all               : natural
   );
   port (
+    pc_IF                       : in  std_logic_vector(31 downto 0);
     pc_IE                       : in  std_logic_vector(31 downto 0);
     fetch_except_data              : in  std_logic_vector(31 downto 0);
     ie_except_data              : in  std_logic_vector(31 downto 0);
@@ -414,7 +415,11 @@ begin
             MCAUSE_internal(h)     <= fetch_except_data;  -- passed from IF Stage
           end if;
           MESTATUS(h)(2 downto 1)        <= MSTATUS_internal(h);
+          if served_fetch_except_condition_lat(h) = '1' then
+          MEPC_internal(h)   <= pc_IF;
+          else
           MEPC_internal(h)   <= pc_except_value_wire(h);
+          end if;
           MSTATUS_internal(h)(0) <= '0';  -- interrupt disabled      
           MSTATUS_internal(h)(1) <= '1';
           if misaligned_err = '1' then

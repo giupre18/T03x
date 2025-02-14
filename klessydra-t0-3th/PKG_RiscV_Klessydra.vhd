@@ -601,6 +601,7 @@ package riscv_klessydra is
 
 
   -- exception codes (riscv mcause register priv isa 1.10)
+  constant INSTR_ACCESS_FAULT_CODE           : std_logic_vector(31 downto 0) := x"00000001";
   constant ILLEGAL_INSN_EXCEPT_CODE          : std_logic_vector(31 downto 0) := x"00000002";
   constant LOAD_ERROR_EXCEPT_CODE            : std_logic_vector(31 downto 0) := x"00000005";
   constant STORE_ERROR_EXCEPT_CODE           : std_logic_vector(31 downto 0) := x"00000007";
