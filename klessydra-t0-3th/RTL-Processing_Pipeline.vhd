@@ -42,12 +42,9 @@ entity Pipeline is
     RF_CEIL                    : natural
   );
   port (
-    fetch_taken_branch            : out std_logic;
-    fetch_except_condition        : out std_logic;
-    fetch_except_data             : out std_logic_vector(31 downto 0); 
-    store_exception_pmp :  in std_logic;
-    load_exception_pmp :  in std_logic;
-    exception_pmp                   : in std_logic;
+    store_exception_pmp        : in std_logic;
+    load_exception_pmp         : in std_logic;
+    exception_pmp              : in std_logic;
     pc_IF                      : in  std_logic_vector(31 downto 0);
     harc_IF                    : in  natural range THREAD_POOL_SIZE-1 downto 0;
     irq_pending                : in  std_logic_vector(THREAD_POOL_SIZE-1 downto 0);
@@ -63,13 +60,16 @@ entity Pipeline is
     misaligned_err             : out std_logic;
     pc_ID                      : out std_logic_vector(31 downto 0);
     pc_IE                      : out std_logic_vector(31 downto 0);
+    if_except_data             : out std_logic_vector(31 downto 0); 
     ie_except_data             : out std_logic_vector(31 downto 0);
     ls_except_data             : out std_logic_vector(31 downto 0);
     taken_branch               : out std_logic;
+    if_taken_branch            : out std_logic;
     ie_taken_branch            : out std_logic;
     ls_taken_branch            : out std_logic;
     set_branch_condition       : out std_logic;
     set_except_condition       : out std_logic;
+    if_except_condition        : out std_logic;
     ie_except_condition        : out std_logic;
     ls_except_condition        : out std_logic;
     set_mret_condition         : out std_logic;
@@ -283,7 +283,7 @@ architecture Pipe of Pipeline is
   signal harc_ID_int                 : natural range THREAD_POOL_SIZE-1 downto 0;
   signal ie_taken_branch_int         : std_logic;
   signal ls_taken_branch_int         : std_logic;
-  signal fetch_taken_branch_int         : std_logic;
+  signal if_taken_branch_int         : std_logic;
   signal RS1_Data_IE_int             : std_logic_vector(31 downto 0);
   signal RS2_Data_IE_int             : std_logic_vector(31 downto 0);
   signal RD_Data_IE_int              : std_logic_vector(31 downto 0);
@@ -291,12 +291,16 @@ architecture Pipe of Pipeline is
   signal harc_exec_int               : natural range THREAD_POOL_SIZE-1 downto 0;
   signal ie_except_condition_int     : std_logic;
   signal ls_except_condition_int     : std_logic;
-  signal fetch_except_condition_int     : std_logic;
+  signal if_except_condition_int     : std_logic;
   signal taken_branch_int            : std_logic;
   signal set_except_condition_int    : std_logic;
   signal state_LS_int                : fsm_LS_states;
-
-  --signal exception_pmp_fetch, exception_pmp_decode,exception_pmp_exe :std_logic :='0';
+  signal load_exception_pmp_exc      : std_logic;
+  signal load_exception_pmp_decode   : std_logic;
+  signal load_exception_pmp_fetch    : std_logic;
+  signal store_exception_pmp_exc     : std_logic;
+  signal store_exception_pmp_decode  : std_logic;
+  signal store_exception_pmp_fetch   : std_logic;
 
   function rs1 (signal instr : in std_logic_vector(31 downto 0)) return integer is
   begin
@@ -318,12 +322,15 @@ architecture Pipe of Pipeline is
     RF_CEIL                    : natural;
     THREAD_POOL_SIZE           : natural
     );
-  port (
-    fetch_taken_branch            : out std_logic;
-    fetch_except_condition        : out std_logic;
-    fetch_except_data             : out std_logic_vector(31 downto 0);  
-    exception_pmp_fetch              : in  std_logic;
-   -- exception_pmp_decode             : out std_logic;
+  port (    
+    load_exception_pmp         : in std_logic;
+    store_exception_pmp        : in std_logic;
+    load_exception_pmp_fetch   : out std_logic;
+    store_exception_pmp_fetch  : out std_logic;
+    if_taken_branch            : out std_logic;
+    if_except_condition        : out std_logic;
+    if_except_data             : out std_logic_vector(31 downto 0);  
+    exception_pmp_fetch        : in  std_logic;
     pc_IF                      : in  std_logic_vector(31 downto 0);
     busy_ID                    : in  std_logic;  
     instr_rvalid_i             : in  std_logic;
@@ -361,9 +368,12 @@ architecture Pipe of Pipeline is
     RF_SIZE                    : natural
     );
   port (
+    load_exception_pmp_fetch   : in std_logic;
+    store_exception_pmp_fetch  : in std_logic;
+    load_exception_pmp_decode  : out std_logic;
+    store_exception_pmp_decode : out std_logic;
+
   -- Branch Control Signals
-   -- exception_pmp_decode             : in std_logic;
-   -- exception_pmp_exe              : out std_logic;
     comparator_en              : out std_logic;
     ls_instr_req               : out std_logic;
     ie_instr_req               : out std_logic;
@@ -428,8 +438,8 @@ architecture Pipe of Pipeline is
       THREAD_POOL_SIZE          : natural
       );
   port (
-        store_exception_pmp :  in std_logic;
-        load_exception_pmp :  in std_logic;
+    store_exception_pmp        : in std_logic;
+    load_exception_pmp         : in std_logic;
     -- clock, and reset active low
     clk_i, rst_ni              : in std_logic;
     -- Program Counter Signals
@@ -489,8 +499,10 @@ architecture Pipe of Pipeline is
     RF_CEIL                   : natural
   );
   port (
-
-   -- exception_pmp_exe                  : in std_logic; 
+    load_exception_pmp_decode : in std_logic;
+    store_exception_pmp_decode: in std_logic;
+    load_exception_pmp_exc    : out std_logic;
+    store_exception_pmp_exc   : out std_logic;
      -- clock, and reset active low
     clk_i, rst_ni             : in  std_logic;
     instr_gnt_i               : in  std_logic;
@@ -633,7 +645,7 @@ begin
   harc_ID <= harc_ID_int;
   ie_taken_branch <= ie_taken_branch_int;
   ls_taken_branch <= ls_taken_branch_int;
-  fetch_taken_branch <= fetch_taken_branch_int;
+  if_taken_branch <= if_taken_branch_int;
 
   RS1_Data_IE <= RS1_Data_IE_int;
   RS2_Data_IE <= RS2_Data_IE_int;
@@ -642,7 +654,7 @@ begin
   harc_exec <= harc_exec_int;
   ls_except_condition <= ls_except_condition_int;
   ie_except_condition <= ie_except_condition_int;
-  fetch_except_condition <= fetch_except_condition_int;
+  if_except_condition <= if_except_condition_int;
 
   set_except_condition <= set_except_condition_int;
   taken_branch <= taken_branch_int;
@@ -655,9 +667,9 @@ begin
     report "Threading configuration not supported"
   severity error;
 
-  set_except_condition_int <= '1' when (IE_except_condition_int = '1' or LS_except_condition_int = '1' or fetch_except_condition_int = '1') else '0';
+  set_except_condition_int <= '1' when (IE_except_condition_int = '1' or LS_except_condition_int = '1' or if_except_condition_int = '1') else '0';
 
-  taken_branch_int <= '1' when (ie_taken_branch_int = '1' or ls_taken_branch_int = '1' or fetch_taken_branch_int ='1') else '0';
+  taken_branch_int <= '1' when (ie_taken_branch_int = '1' or ls_taken_branch_int = '1' or if_taken_branch_int ='1') else '0';
           
   csr_wdata_i <= ie_csr_wdata_i;
 
@@ -691,11 +703,14 @@ begin
     RF_CEIL                    => RF_CEIL
     )
   port map(
-        fetch_taken_branch            => fetch_taken_branch_int,
-    fetch_except_condition        => fetch_except_condition_int,
-    fetch_except_data             =>  fetch_except_data,
-    exception_pmp_fetch             => exception_pmp,
-    --exception_pmp_decode            => exception_pmp_decode,
+    store_exception_pmp        => store_exception_pmp,
+    store_exception_pmp_fetch  => store_exception_pmp_fetch,
+    load_exception_pmp         => load_exception_pmp,
+    load_exception_pmp_fetch   => load_exception_pmp_fetch,
+    if_taken_branch            => if_taken_branch_int,
+    if_except_condition        => if_except_condition_int,
+    if_except_data             => if_except_data,
+    exception_pmp_fetch        => exception_pmp,
     pc_IF                      => pc_IF,
     busy_ID                    => busy_ID,   
     instr_rvalid_i             => instr_rvalid_i,
@@ -728,9 +743,11 @@ begin
     RF_CEIL                    => RF_CEIL,
     RF_SIZE                    => RF_SIZE
     )
-  port map(            
-    --exception_pmp_decode             => exception_pmp_decode,
-   -- exception_pmp_exe              => exception_pmp_exe,
+  port map(   
+    store_exception_pmp_decode => store_exception_pmp_decode,
+    store_exception_pmp_fetch  => store_exception_pmp_fetch,
+    load_exception_pmp_decode  => load_exception_pmp_decode,
+    load_exception_pmp_fetch   => load_exception_pmp_fetch,
     comparator_en              => comparator_en,
     ie_instr_req               => ie_instr_req,        
     ls_instr_req               => ls_instr_req,        
@@ -793,8 +810,8 @@ begin
     THREAD_POOL_SIZE           => THREAD_POOL_SIZE
     )
   port map(
-            store_exception_pmp =>     store_exception_pmp,
-        load_exception_pmp =>     load_exception_pmp,
+    store_exception_pmp =>     store_exception_pmp_exc,
+    load_exception_pmp =>     load_exception_pmp_exc,
     clk_i                      => clk_i,
     rst_ni                     => rst_ni,    
     irq_pending                => irq_pending,
@@ -847,7 +864,10 @@ begin
     RF_CEIL                    => RF_CEIL
   )
   port map(
-       -- exception_pmp_exe               => exception_pmp,
+    store_exception_pmp_decode => store_exception_pmp_decode,
+    store_exception_pmp_exc    => store_exception_pmp_exc,
+    load_exception_pmp_decode  => load_exception_pmp_decode,
+    load_exception_pmp_exc     => load_exception_pmp_exc,
     clk_i                      => clk_i,
     rst_ni                     => rst_ni,
     instr_gnt_i                => instr_gnt_i,

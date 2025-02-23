@@ -16,63 +16,27 @@ entity PMP_Unit is
   );
   port (
     -- Data Memory interfece 
-    data_we_pmp              :out std_logic;
-    data_we_o               : in std_logic;
-
-    data_addr_pmp        :out std_logic_vector(31 downto 0);
-    data_addr_o             : in std_logic_vector(31 downto 0);
-
-    data_gnt_pmp             :out std_logic;
-    data_gnt_effettivo       : in std_logic;
-    load_exception_pmp : out std_logic;
-    store_exception_pmp : out std_logic;
-
-  -- program memory interface
-    instr_addr_o	       : in std_logic_vector(31 downto 0);
-    instr_addr_pmp       : out std_logic_vector(31 downto 0);
-
-    instr_pmpvalid_o	       : out  std_logic;
-
-
-    instr_gnt_pmp             :out std_logic;
-    instr_gnt_effettivo       : in std_logic;
-    
-
-
-
-    ie_except_data            : in std_logic_vector(31 downto 0);
-    IE_except_condition       : in std_logic;
-    ie_taken_branch           : in std_logic; 
-
-    ie_except_data_pmp           : out std_logic_vector(31 downto 0);
-    IE_except_condition_pmp       : out std_logic;
-    ie_taken_branch_pmp           : out std_logic; 
-
-    set_except_condition          : in std_logic;
-    taken_branch                  : in std_logic;
-
-    set_except_condition_pmp          : out std_logic;
-    taken_branch_pmp                  : out std_logic;
-    exception_pmp   : out std_logic;
-  -- segnali di debug
-    addr_start_debug: out std_logic_vector(31 downto 0);
-    addr_end_debug: out std_logic_vector(31 downto 0);
-
+    data_addr_o                : in std_logic_vector(31 downto 0);
+    load_exception_pmp         : out std_logic;
+    store_exception_pmp        : out std_logic;
+    -- program memory interface
+    instr_addr_o               : in std_logic_vector(31 downto 0);
+    exception_pmp              : out std_logic;
+    -- signal for debug
+    addr_start_debug           : out std_logic_vector(31 downto 0);
+    addr_end_debug             : out std_logic_vector(31 downto 0);
     --PMP Registers Inputs
-    pmpcfg_in       : in  pmpcfg_array;
-    pmpaddr_in      : in  pmpaddr_array;
-    clk_i                      : in  std_logic;
-    rst_ni                     : in  std_logic
-
+    pmpcfg_in                  : in  pmpcfg_array;
+    pmpaddr_in                 : in  pmpaddr_array
   );
 end PMP_Unit;
 
 
 architecture RTL of PMP_Unit is
-  -- Definizione dei tipi di indirizzamento
+  -- Defining Addressing Types
   type pmp_match_type is (OFF,TOR, NA4, NAPOT);
 
-  -- Funzione per determinare il tipo di matching
+  -- Function to determine the type of matching
 function get_match_type(pmpcfg_in_field  : std_logic_vector(7 downto 0)) return pmp_match_type is
   begin
     if pmpcfg_in_field (4) = '1' and pmpcfg_in_field (3) = '1' then
@@ -82,7 +46,6 @@ function get_match_type(pmpcfg_in_field  : std_logic_vector(7 downto 0)) return 
     elsif pmpcfg_in_field (4) = '0' and pmpcfg_in_field (3) = '1' then
       return TOR;
      else 
-     --pmpcfg_in_field (4) = '0' and pmpcfg_in_field (3) = '0' then
       return OFF;
     end if;
   end function;
@@ -92,20 +55,17 @@ function extract_pmpcfg_in_field(
         pmpcfg_in : pmpcfg_array; 
         segment_index : integer
     ) return std_logic_vector is
-        variable reg_index   : integer;  -- Indice del registro
-        variable field_index : integer;  -- Indice del campo all'interno del registro
-        variable pmpcfg_in_reg  : std_logic_vector(31 downto 0); -- Registro corrente
-        variable extracted_field : std_logic_vector(7 downto 0); -- Campo estratto
+        variable reg_index   : integer;  -- Register Index
+        variable field_index : integer;  -- Field index within the register
+        variable pmpcfg_in_reg  : std_logic_vector(31 downto 0); 
+        variable extracted_field : std_logic_vector(7 downto 0);
     begin
-        -- Calcola quale registro contiene il segmento richiesto
+        -- Calculate which register contains the requested segment
         reg_index := segment_index / 4;
-        -- Calcola quale segmento del registro Ã¨ richiesto
         field_index := segment_index mod 4;
-
-        -- Estrai il registro corrispondente
         pmpcfg_in_reg := pmpcfg_in(reg_index);
 
-        -- Estrai il campo specifico (8 bit) dal registro
+        -- Extract the specific field (8 bits) from the register
         case field_index is
             when 0 => extracted_field := pmpcfg_in_reg(7 downto 0);
             when 1 => extracted_field := pmpcfg_in_reg(15 downto 8);
@@ -121,7 +81,6 @@ function extract_pmpcfg_in_field(
 
   function check_permissions(pmpcfg_in_field  : std_logic_vector(7 downto 0); access_type : std_logic_vector(1 downto 0)) return std_logic is
   begin
-    -- Estrarre i bit di permesso
     -- cfg(2): X (Execute)
     -- cfg(1): W (Write)
     -- cfg(0): R (Read)
@@ -136,12 +95,10 @@ function extract_pmpcfg_in_field(
         return '0';
     end case;
   end function;
---signal access_type_datamem : std_logic_vector(1 downto 0); 
---signal data_we_pmp_int :std_logic;
 
 begin
 
-process (pmpcfg_in, pmpaddr_in, data_addr_o, data_we_o, instr_addr_o,data_gnt_effettivo,instr_gnt_effettivo,ie_except_data,IE_except_condition,ie_taken_branch,set_except_condition,taken_branch)
+process (pmpcfg_in, pmpaddr_in, data_addr_o,instr_addr_o)
     variable pmpcfg_in_field : std_logic_vector(7 downto 0) ;
     variable match_type : pmp_match_type ; 
     variable addr_start :  unsigned(31 downto 0);
@@ -153,43 +110,29 @@ process (pmpcfg_in, pmpaddr_in, data_addr_o, data_we_o, instr_addr_o,data_gnt_ef
    
 
 begin
-      set_except_condition_pmp <=set_except_condition;
-      taken_branch_pmp <= taken_branch;
-                        store_exception_pmp <= '0';
-                  load_exception_pmp <= '0';
- exception_pmp <= '0';
-    ie_except_data_pmp <= ie_except_data;
-    IE_except_condition_pmp <= IE_except_condition;
-    ie_taken_branch_pmp <= ie_taken_branch;
-
-    instr_addr_pmp <= instr_addr_o;
-    ---instr_rvalid_effettivo <= '0';
+    store_exception_pmp <= '0';
+    load_exception_pmp <= '0';
+    exception_pmp <= '0';
     access_valid_found := '0';
     access_valid_found_instr := '0';
-    data_gnt_pmp <= data_gnt_effettivo;
-    data_we_pmp <= data_we_o;
-    data_addr_pmp <= data_addr_o;
-
-   instr_gnt_pmp<=instr_gnt_effettivo;
 
 for i in 0 to PMP_REGIONS-1 loop
 
-    -- Loop attraverso le regioni PMP
-      -- Estrai il registro pmpcfg_in corrente (32 bit) e il segmento pmpcfg_in_field  (8 bit)
+      -- Extract the current pmpcfg_in register (32 bits) and the pmpcfg_in_field segment (8 bits)
       pmpcfg_in_field  := extract_pmpcfg_in_field (pmpcfg_in, i );
 
-      -- Determina il tipo di matching
+      -- Determine the type of matching
       match_type := get_match_type(pmpcfg_in_field );
 
 
 
       if match_type = TOR then
         if i = 0 then
-          addr_start := (others => '0'); -- Inizio memoria
+          addr_start := (others => '0'); 
         else
-          addr_start := unsigned(pmpaddr_in(i-1)) sll 2; -- Moltiplica per granularità
+          addr_start := unsigned(pmpaddr_in(i-1)) sll 2; -- Multiply by granularity
         end if;
-        addr_end := unsigned(pmpaddr_in(i)) sll 2; -- Fine regione
+        addr_end := unsigned(pmpaddr_in(i)) sll 2;
 
 
 
@@ -216,20 +159,14 @@ for i in 0 to PMP_REGIONS-1 loop
 -----data_addr_o
 
 
-      -- Verifica se l'indirizzo di accesso rientra nella regione
+      -- Check if the login address is within the region
       if data_addr_o >= std_logic_vector(addr_start) then
        	if data_addr_o <= std_logic_vector(addr_end) then
            access_valid_found := '1'; -- Accesso valido trovato
     	    if check_permissions(pmpcfg_in_field , "00") = '0' then
-                  --data_gnt_pmp<='0';
-                  --data_we_pmp <= '0';
-                  --data_addr_pmp<=(others => '0');
                   load_exception_pmp <= '1';
           end if;
           if check_permissions(pmpcfg_in_field , "01") = '0' then
-                  --data_gnt_pmp<='0';
-                  --data_we_pmp <= '0';
-                  --data_addr_pmp<=(others => '0');
                   store_exception_pmp <= '1';
           end if;
         exit;
@@ -242,22 +179,18 @@ end loop;
 
 for i in 0 to PMP_REGIONS-1 loop
 
-  
-      -- Estrai il registro pmpcfg_in corrente (32 bit) e il segmento pmpcfg_in_field  (8 bit)
       pmpcfg_in_field  := extract_pmpcfg_in_field (pmpcfg_in, i );
-
-      -- Determina il tipo di matching
       match_type := get_match_type(pmpcfg_in_field );
 
 
 
       if match_type = TOR then
-        if i = 0 then
-          addr_start := (others => '0'); -- Inizio memoria
-        else
-          addr_start := unsigned(pmpaddr_in(i-1)) sll 2; -- Moltiplica per granularità
-        end if;
-        addr_end := unsigned(pmpaddr_in(i)) sll 2; -- Fine regione
+          if i = 0 then
+            addr_start := (others => '0'); 
+          else
+            addr_start := unsigned(pmpaddr_in(i-1)) sll 2; 
+          end if;
+         addr_end := unsigned(pmpaddr_in(i)) sll 2; 
 
 
 
@@ -289,15 +222,7 @@ for i in 0 to PMP_REGIONS-1 loop
        if instr_addr_o <= std_logic_vector(addr_end) then
          access_valid_found_instr:= '1'; -- Accesso valido trovato
           if check_permissions(pmpcfg_in_field , "10") = '0' then
-                  --instr_gnt_pmp<='0';
-                  exception_pmp<= '1';
-
-                                    --ie_taken_branch_pmp <= '1';
-                  --IE_except_condition_pmp <= '1';
-                   --set_except_condition_pmp <= '1';
-                   --taken_branch_pmp <= '1';
-                  --ie_except_data_pmp <= ILLEGAL_INSN_EXCEPT_CODE;
-                 -- instr_addr_pmp<= x"00000013";
+             exception_pmp<= '1';
           end if;
           exit;
        end if;   
@@ -309,34 +234,20 @@ end loop;
 
 
    if access_valid_found = '0' then
-      data_gnt_pmp<='0';
+      load_exception_pmp <= '1';
+      store_exception_pmp <= '1';
    end if;
 
 
-   --if access_valid_found_instr = '0' then
-    --   instr_rvalid_effettivo <= '0';
-   --end if;
+   if access_valid_found_instr = '0' then
+      exception_pmp<= '1';
+   end if;
 
 
 
---end if;
 
 
+end process;
 
-  end process;
-
---process(clk_i,rst_ni)
---begin
-
---if rst_ni ='0' then
-   --exception_pmp <= '0';
-  -- exception_pmp <= '0';
---elsif rising_edge(clk_i) then
---exception_pmp <= '0';
---if exception_pmp2 ='1' then
-    --             exception_pmp <= '1';
-  --end if;
-  --end if;
---end process;
 
 end RTL;

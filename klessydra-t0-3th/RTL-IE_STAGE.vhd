@@ -31,7 +31,10 @@ entity IE_STAGE is
     RF_CEIL                   : natural
   );
   port (
-       -- exception_pmp_exe                  : in std_logic; 
+    load_exception_pmp_decode : in std_logic;
+    store_exception_pmp_decode: in std_logic;
+    load_exception_pmp_exc    : out std_logic;
+    store_exception_pmp_exc   : out std_logic;
   -- clock, and reset active low
     clk_i, rst_ni             : in  std_logic;
     instr_gnt_i               : in  std_logic;
@@ -232,7 +235,6 @@ begin
   fsm_IE_sync : process(clk_i, rst_ni)
   begin
     if rst_ni = '0' then
-      --exception_pmp_exe_int <= '0';
       IE_WB                  <= std_logic_vector(to_unsigned(0, 32));
       IE_WB_EN               <= '0';
       MUL_WB_EN              <= '0';
@@ -243,9 +245,8 @@ begin
       halt_update_IE         <= (others => '0');
       halt_update_IE_pending <= (others => '0');
     elsif rising_edge(clk_i) then
---exception_pmp_exe_int<= exception_pmp_exe;
-    
-    
+      load_exception_pmp_exc <= load_exception_pmp_decode;
+      store_exception_pmp_exc <= store_exception_pmp_decode;
       IE_WB_EN         <= '0';
       MUL_WB_EN        <= '0';
       WB_EN_next_IE    <= '0';

@@ -39,12 +39,14 @@ entity CSR_Unit is
     count_all               : natural
   );
   port (
+    store_exception_pmp         : in std_logic;
+    load_exception_pmp          : in std_logic;
     pc_IF                       : in  std_logic_vector(31 downto 0);
     pc_IE                       : in  std_logic_vector(31 downto 0);
-    fetch_except_data              : in  std_logic_vector(31 downto 0);
+    if_except_data           : in  std_logic_vector(31 downto 0);
     ie_except_data              : in  std_logic_vector(31 downto 0);
     ls_except_data              : in  std_logic_vector(31 downto 0);
-    served_fetch_except_condition  : in  std_logic_vector(THREAD_POOL_SIZE-1 downto 0);
+    served_if_except_condition  : in  std_logic_vector(THREAD_POOL_SIZE-1 downto 0);
     served_ie_except_condition  : in  std_logic_vector(THREAD_POOL_SIZE-1 downto 0);
     served_ls_except_condition  : in  std_logic_vector(THREAD_POOL_SIZE-1 downto 0);
     harc_EXEC                   : in  natural range THREAD_POOL_SIZE-1 downto 0;
@@ -152,7 +154,7 @@ architecture CSR of CSR_Unit is
   signal irq_ack_o_internal     : std_logic;
   signal trap_hndlr             : std_logic_vector(harc_range);
 
-  signal served_fetch_except_condition_lat  : std_logic_vector(harc_range);
+  signal served_if_except_condition_lat  : std_logic_vector(harc_range);
   signal served_ie_except_condition_lat  : std_logic_vector(harc_range);
   signal served_ls_except_condition_lat  : std_logic_vector(harc_range);
   signal served_except_condition_lat     : std_logic_vector(harc_range);
@@ -184,27 +186,23 @@ architecture CSR of CSR_Unit is
         pmpcfg_in : pmpcfg_array; 
         segment_index : integer
     ) return std_logic_vector is
-        variable reg_index   : integer;  -- Indice del registro
-        variable field_index : integer;  -- Indice del campo all'interno del registro
-        variable pmpcfg_in_reg  : std_logic_vector(31 downto 0); -- Registro corrente
-        variable extracted_field : std_logic_vector(7 downto 0); -- Campo estratto
+        variable reg_index   : integer;  
+        variable field_index : integer;
+        variable pmpcfg_in_reg  : std_logic_vector(31 downto 0); 
+        variable extracted_field : std_logic_vector(7 downto 0); 
     begin
-        -- Calcola quale registro contiene il segmento richiesto
         reg_index := segment_index / 4;
-        -- Calcola quale segmento del registro Ã¨ richiesto
         field_index := segment_index mod 4;
 
-        -- Estrai il registro corrispondente
         pmpcfg_in_reg := pmpcfg_in(reg_index);
 
-        -- Estrai il campo specifico (8 bit) dal registro
         case field_index is
             when 0 => extracted_field := pmpcfg_in_reg(7 downto 0);
             when 1 => extracted_field := pmpcfg_in_reg(15 downto 8);
             when 2 => extracted_field := pmpcfg_in_reg(23 downto 16);
             when 3 => extracted_field := pmpcfg_in_reg(31 downto 24);
             when others =>
-                extracted_field := (others => '0'); -- Caso di errore, valore di default
+                extracted_field := (others => '0'); 
         end case;
 
         return extracted_field;
@@ -250,7 +248,7 @@ begin
 
     variable pmpcfg_in_field : std_logic_vector(7 downto 0) ;
     variable pmpcfg_internal : pmpcfg_array;
-    variable pmpaddr_internal : pmpaddr_array;---------------------------------------------------------------------aggiungo io
+    variable pmpaddr_internal : pmpaddr_array;
 
     begin
      
@@ -290,7 +288,7 @@ begin
           PCER_int(h)                           <= PCER_RESET_VALUE;
         end if;
         MIP_internal(h)                     <= MIP_RESET_VALUE;
-        served_fetch_except_condition_lat(h)   <= '0'; 
+        served_if_except_condition_lat(h)   <= '0'; 
         served_ie_except_condition_lat(h)   <= '0'; 
         served_ls_except_condition_lat(h)   <= '0'; 
         served_except_condition_lat(h)      <= '0';
@@ -328,7 +326,7 @@ begin
         --  ██║██║  ██║╚██████╔╝██╔╝   ███████╗██╔╝ ██╗╚██████╗███████╗██║        ██║       ██║  ██║██║  ██║██║ ╚████║██████╔╝███████╗███████╗██║  ██║  --
         --  ╚═╝╚═╝  ╚═╝ ╚══▀▀═╝ ╚═╝    ╚══════╝╚═╝  ╚═╝ ╚═════╝╚══════╝╚═╝        ╚═╝       ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═══╝╚═════╝ ╚══════╝╚══════╝╚═╝  ╚═╝  --
         --------------------------------------------------------------------------------------------------------------------------------------------------
-        served_fetch_except_condition_lat(h)   <= served_fetch_except_condition(h);
+        served_if_except_condition_lat(h)   <= served_if_except_condition(h);
         served_ie_except_condition_lat(h)   <= served_ie_except_condition(h);
         served_ls_except_condition_lat(h)   <= served_ls_except_condition(h);
         served_except_condition_lat(h)      <= served_except_condition(h);
@@ -411,12 +409,14 @@ begin
             MCAUSE_internal(h)     <= ls_except_data;  -- passed from LS unit
           elsif served_ie_except_condition_lat(h) = '1' then
             MCAUSE_internal(h)     <= ie_except_data;  -- passed from IE Stage
-            elsif served_fetch_except_condition_lat(h) = '1' then
-            MCAUSE_internal(h)     <= fetch_except_data;  -- passed from IF Stage
+          elsif served_if_except_condition_lat(h) = '1' then
+            MCAUSE_internal(h)     <= if_except_data;  -- passed from IF Stage
           end if;
           MESTATUS(h)(2 downto 1)        <= MSTATUS_internal(h);
-          if served_fetch_except_condition_lat(h) = '1' then
+          if served_if_except_condition_lat(h) = '1' then
           MEPC_internal(h)   <= pc_IF;
+          elsif served_ls_except_condition_lat(h) = '1' and (load_exception_pmp = '1' or store_exception_pmp ='1') then
+          MEPC_internal(h)   <= data_addr_internal;
           else
           MEPC_internal(h)   <= pc_except_value_wire(h);
           end if;

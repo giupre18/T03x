@@ -33,8 +33,10 @@ entity ID_STAGE is
     RF_CEIL                    : natural
     );
   port (
-   -- exception_pmp_decode             : in std_logic;
-    --exception_pmp_exe              : out std_logic;
+    load_exception_pmp_fetch   : in std_logic;
+    store_exception_pmp_fetch  : in std_logic;
+    load_exception_pmp_decode  : out std_logic;
+    store_exception_pmp_decode : out std_logic;
   -- Branch Control Signals
     comparator_en              : out std_logic;
     ls_instr_req               : out std_logic;
@@ -207,8 +209,6 @@ begin
       comparator_en       <= '0';
       WB_EN_next_ID       <= '0';
     elsif rising_edge(clk_i) then
-      
-    --exception_pmp_exe <= exception_pmp_decode;
       ls_instr_req     <= '0';
       ie_instr_req     <= '0';
       WB_EN_next_ID    <= '0'; 
@@ -585,6 +585,8 @@ begin
     if rst_ni = '0' then
       instr_rvalid_ID_int_lat <= '0';
     elsif rising_edge(clk_i) then
+    load_exception_pmp_decode <= load_exception_pmp_fetch;
+    store_exception_pmp_decode <= store_exception_pmp_fetch;
       if core_busy_LS      = '0' and 
          core_busy_IE      = '0' and 
          ls_parallel_exec_int  = '1' then

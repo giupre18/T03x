@@ -180,7 +180,7 @@ architecture Klessydra_M of klessydra_t0_3th_core is
   -- pc updater signals
   signal served_ie_except_condition      : std_logic_vector(harc_range);
   signal served_ls_except_condition      : std_logic_vector(harc_range);
-  signal served_fetch_except_condition      : std_logic_vector(harc_range);
+  signal served_if_except_condition      : std_logic_vector(harc_range);
   signal served_except_condition         : std_logic_vector(harc_range);
   signal served_mret_condition           : std_logic_vector(harc_range);
   signal served_irq                      : std_logic_vector(harc_range);
@@ -188,15 +188,15 @@ architecture Klessydra_M of klessydra_t0_3th_core is
   signal taken_branch_pending            : std_logic_vector(harc_range);
   signal ie_except_data                  : std_logic_vector(31 downto 0);
   signal ls_except_data                  : std_logic_vector(31 downto 0);
-  signal fetch_except_data                  : std_logic_vector(31 downto 0);
+  signal if_except_data                  : std_logic_vector(31 downto 0);
   signal taken_branch                    : std_logic;
   signal ie_taken_branch                 : std_logic;
   signal ls_taken_branch                 : std_logic;
-  signal fetch_taken_branch                 : std_logic;
+  signal if_taken_branch                 : std_logic;
   signal set_branch_condition            : std_logic;
   signal ie_except_condition             : std_logic;
   signal ls_except_condition             : std_logic;
-  signal fetch_except_condition             : std_logic;
+  signal if_except_condition             : std_logic;
   signal set_except_condition            : std_logic;
   signal set_mret_condition              : std_logic;
   signal absolute_address                : std_logic_vector(31 downto 0);
@@ -244,34 +244,12 @@ architecture Klessydra_M of klessydra_t0_3th_core is
   -- Internal signal (VHDL1993)
   signal data_we_o_int          : std_logic;
   signal data_req_o_int         : std_logic;
+  
+  signal data_addr_pipe_internal: std_logic_vector(31 downto 0);
+  signal exception_pmp         : std_logic;
+  signal load_exception_pmp    : std_logic;
+  signal store_exception_pmp   : std_logic;
 
-
-
-signal data_err_sync : std_logic;
-signal data_err_writeinternal    : std_logic;
-signal data_err_readinternal    : std_logic;
-signal instr_pmpvalid_internal : std_logic;
-signal instr_pmpvalid_sync : std_logic;
-
-
-signal data_gnt_pmp_internal :std_logic;
-signal data_we_pmp_internal : std_logic;
-       
-signal instr_gnt_pmp :std_logic;
-signal instr_addr_pmp : std_logic_vector (31 downto 0);
-
-signal data_addr_pmp_internal :std_logic_vector(31 downto 0);
-signal data_addr_pipe_internal :std_logic_vector(31 downto 0);
-
-signal exception_pmp : std_logic;
-signal  load_exception_pmp :  std_logic;
-signal  store_exception_pmp :  std_logic;
- signal ie_except_data_pmp           :  std_logic_vector(31 downto 0);
- signal   IE_except_condition_pmp       :  std_logic;
- signal   ie_taken_branch_pmp           :  std_logic; 
-
-signal set_except_condition_pmp : std_logic;
-signal taken_branch_pmp : std_logic;
 
   function and_const(a: natural; b: natural) return natural is
     variable c : natural;
@@ -311,11 +289,11 @@ signal taken_branch_pmp : std_logic;
     taken_branch                      : in  std_logic;
     ie_taken_branch                   : in  std_logic;
     ls_taken_branch                   : in  std_logic;
-    fetch_taken_branch                   : in  std_logic;
+    if_taken_branch                   : in  std_logic;
     set_branch_condition              : in  std_logic;
     ie_except_condition               : in  std_logic;
     ls_except_condition               : in  std_logic;
-    fetch_except_condition               : in  std_logic;
+    if_except_condition               : in  std_logic;
     set_except_condition              : in  std_logic;
     set_mret_condition                : in  std_logic;
     set_wfi_condition                 : in  std_logic;
@@ -329,7 +307,7 @@ signal taken_branch_pmp : std_logic;
     instr_word_IE                     : in  std_logic_vector(31 downto 0);
     pc_IF                             : out std_logic_vector(31 downto 0);
     harc_IF                           : out harc_range;
-    served_fetch_except_condition        : out std_logic_vector(harc_range);
+    served_if_except_condition        : out std_logic_vector(harc_range);
     served_ie_except_condition        : out std_logic_vector(harc_range);
     served_ls_except_condition        : out std_logic_vector(harc_range);
     served_except_condition           : out std_logic_vector(harc_range);
@@ -351,8 +329,7 @@ signal taken_branch_pmp : std_logic;
 
   component CSR_Unit
   generic (
-        PMP_REGIONS             : natural := 64; -- Numero di regioni PMP supportate
-
+    PMP_REGIONS             : natural := 64; -- Numero di regioni PMP supportate
     THREAD_POOL_SIZE_GLOBAL     : natural;
     THREAD_POOL_SIZE            : natural;
     MCYCLE_EN                   : natural;
@@ -362,12 +339,14 @@ signal taken_branch_pmp : std_logic;
     count_all                   : natural
   );
   port (
+    store_exception_pmp         : in std_logic;
+    load_exception_pmp          : in std_logic;
     pc_IF                       : in  std_logic_vector(31 downto 0);
     pc_IE                       : in  std_logic_vector(31 downto 0);
-    fetch_except_data              : in  std_logic_vector(31 downto 0);
+    if_except_data              : in  std_logic_vector(31 downto 0);
     ie_except_data              : in  std_logic_vector(31 downto 0);
     ls_except_data              : in  std_logic_vector(31 downto 0);
-    served_fetch_except_condition  : in  std_logic_vector(harc_range);
+    served_if_except_condition  : in  std_logic_vector(harc_range);
     served_ie_except_condition  : in  std_logic_vector(harc_range);
     served_ls_except_condition  : in  std_logic_vector(harc_range);
     harc_EXEC                   : in  natural range THREAD_POOL_SIZE-1 downto 0;
@@ -440,12 +419,9 @@ signal taken_branch_pmp : std_logic;
     --TPS_CEIL                   : natural
     );
   port (
-        fetch_taken_branch            : out std_logic;
-    fetch_except_condition        : out std_logic;
-    fetch_except_data             : out std_logic_vector(31 downto 0);  
-                store_exception_pmp : in std_logic;
-            load_exception_pmp : in std_logic;
-     exception_pmp : in std_logic;
+    store_exception_pmp        : in std_logic;
+    load_exception_pmp         : in std_logic;
+    exception_pmp              : in std_logic;
     pc_IF                      : in  std_logic_vector(31 downto 0);
     harc_IF                    : in  harc_range;
     irq_pending                : in  std_logic_vector(harc_range);
@@ -460,13 +436,16 @@ signal taken_branch_pmp : std_logic;
     misaligned_err             : out std_logic;
     pc_ID                      : out std_logic_vector(31 downto 0);
     pc_IE                      : out std_logic_vector(31 downto 0);
+    if_except_data             : out std_logic_vector(31 downto 0);  
     ie_except_data             : out std_logic_vector(31 downto 0);
     ls_except_data             : out std_logic_vector(31 downto 0);
     taken_branch               : out std_logic;
+    if_taken_branch            : out std_logic;
     ie_taken_branch            : out std_logic;
     ls_taken_branch            : out std_logic;
     set_branch_condition       : out std_logic;
-    set_except_condition       : out std_logic;        
+    set_except_condition       : out std_logic;
+    if_except_condition        : out std_logic;        
     ie_except_condition        : out std_logic;
     ls_except_condition        : out std_logic;
     set_mret_condition         : out std_logic;
@@ -533,55 +512,22 @@ signal taken_branch_pmp : std_logic;
   
   component PMP_Unit is
     generic (
-    PMP_REGIONS : natural := 64 -- Numero di regioni PMP supportate
+    PMP_REGIONS                : natural := 64 --Number of PMP regions supported
   );
   port (
     -- Data Memory interfece 
-    data_we_pmp              :out std_logic;
-    data_we_o               : in std_logic;
-
-    data_addr_pmp         :out std_logic_vector(31 downto 0);
-    data_addr_o             : in std_logic_vector(31 downto 0);
-
-    data_gnt_pmp             :out std_logic;
-    data_gnt_effettivo       : in std_logic;
-        load_exception_pmp : out std_logic;
-        store_exception_pmp : out std_logic;
-  -- program memory interface
-    instr_addr_o         : in std_logic_vector(31 downto 0);
-    instr_addr_pmp       :out std_logic_vector(31 downto 0);
-
-    instr_pmpvalid_o         : out  std_logic;
-
-    instr_gnt_pmp             :out std_logic;
-    instr_gnt_effettivo       : in std_logic;
-
-    ie_except_data            : in std_logic_vector(31 downto 0);
-    IE_except_condition       : in std_logic;
-    ie_taken_branch           : in std_logic; 
-
-    ie_except_data_pmp           : out std_logic_vector(31 downto 0);
-    IE_except_condition_pmp       : out std_logic;
-    ie_taken_branch_pmp           : out std_logic; 
-
-    set_except_condition          : in std_logic;
-    taken_branch                  : in std_logic;
-
-    set_except_condition_pmp          : out std_logic;
-    taken_branch_pmp                  : out std_logic;
-      exception_pmp : out std_logic;
-
-  -- segnali di debug
-    addr_start_debug: out std_logic_vector(31 downto 0);
-    addr_end_debug: out std_logic_vector(31 downto 0);
-
-    
+    data_addr_o                : in std_logic_vector(31 downto 0);
+    load_exception_pmp         : out std_logic;
+    store_exception_pmp        : out std_logic;
+    -- program memory interface
+    instr_addr_o               : in std_logic_vector(31 downto 0);
+    exception_pmp              : out std_logic;
+    -- signal for debug
+    addr_start_debug           : out std_logic_vector(31 downto 0);
+    addr_end_debug             : out std_logic_vector(31 downto 0);
     --PMP Registers Inputs
-    pmpcfg_in       : in  pmpcfg_array;
-    pmpaddr_in      : in  pmpaddr_array;
-    clk_i                      : in  std_logic;
-    rst_ni                     : in  std_logic
-
+    pmpcfg_in                  : in  pmpcfg_array;
+    pmpaddr_in                 : in  pmpaddr_array
   );
 end component;
 
@@ -590,11 +536,9 @@ end component;
 begin
 
   -- Connecting signals to ports
-  data_we_o <= data_we_pmp_internal;
+  data_we_o <= data_we_o_int;
  data_req_o <= data_req_o_int;
- data_addr_o <= data_addr_pmp_internal;
---data_req_o <= data_req_pmp_internal;
-
+ data_addr_o <= data_addr_pipe_internal;
   sw_irq_o <= sw_irq;
   
 
@@ -615,9 +559,6 @@ begin
   begin
     if rst_ni = '0' then
     elsif rising_edge(clk_i) then
-
-    --data_err_sync <= data_err_writeinternal or data_err_i;
-   --  instr_pmpvalid_sync <= instr_pmpvalid_internal;
       pc_except_value <= pc_except_value_wire;
     end if;
   end process;
@@ -632,11 +573,11 @@ begin
       absolute_address            => absolute_address,       
       PC_offset                   => PC_offset,
       taken_branch                => taken_branch,
-      fetch_taken_branch             => fetch_taken_branch,
+      if_taken_branch             => if_taken_branch,
       ie_taken_branch             => ie_taken_branch,
       ls_taken_branch             => ls_taken_branch,
       set_branch_condition        => set_branch_condition,
-      fetch_except_condition         => fetch_except_condition,
+      if_except_condition         => if_except_condition,
       ie_except_condition         => ie_except_condition,
       ls_except_condition         => ls_except_condition,
       set_except_condition        => set_except_condition,
@@ -655,7 +596,7 @@ begin
       instr_word_IE               => instr_word_IE,
       pc_IF                       => pc_IF,
       harc_IF                     => harc_IF,
-      served_fetch_except_condition  => served_fetch_except_condition,
+      served_if_except_condition  => served_if_except_condition,
       served_ie_except_condition  => served_ie_except_condition,
       served_ls_except_condition  => served_ls_except_condition,
       served_except_condition     => served_except_condition,
@@ -676,8 +617,7 @@ begin
 
   CSR : CSR_Unit
     generic map (
-          PMP_REGIONS             => PMP_REGIONS,
-
+      PMP_REGIONS                 => PMP_REGIONS,
       THREAD_POOL_SIZE_GLOBAL     => THREAD_POOL_SIZE_GLOBAL_GEN,
       THREAD_POOL_SIZE            => THREAD_POOL_SIZE_GEN,
       MCYCLE_EN                   => MCYCLE_EN,
@@ -687,12 +627,14 @@ begin
       count_all                   => count_all
     )
     port map(
+      load_exception_pmp          => load_exception_pmp,
+      store_exception_pmp         => store_exception_pmp,
       pc_IF                       => pc_IF,
       pc_IE                       => pc_IE,
-      fetch_except_data        => fetch_except_data,
+      if_except_data              => if_except_data,
       ie_except_data              => ie_except_data,
       ls_except_data              => ls_except_data,
-      served_fetch_except_condition  => served_fetch_except_condition,
+      served_if_except_condition  => served_if_except_condition,
       served_ie_except_condition  => served_ie_except_condition,
       served_ls_except_condition  => served_ls_except_condition,
       harc_EXEC                   => harc_EXEC,
@@ -729,9 +671,9 @@ begin
       core_id_i                   => core_id_i,
       instr_rvalid_i              => instr_rvalid_i,
       instr_rvalid_IE             => instr_rvalid_IE,
-      data_we_o                   => data_we_pmp_internal,
+      data_we_o                   => data_we_o_int,
       data_req_o                  => data_req_o_int,
-      data_gnt_i                  => data_gnt_pmp_internal,
+      data_gnt_i                  => data_gnt_i,
       irq_i                       => irq_i,
       irq_id_i                    => irq_id_i,
       irq_id_o                    => irq_id_o,
@@ -763,20 +705,18 @@ begin
       --TPS_CEIL                => TPS_CEIL
       )
     port map(
-          fetch_taken_branch            =>fetch_taken_branch,
-    fetch_except_condition        => fetch_except_condition,
-    fetch_except_data             =>  fetch_except_data,
-                    store_exception_pmp =>     store_exception_pmp ,
-              load_exception_pmp =>     load_exception_pmp ,
-      exception_pmp => exception_pmp,
-      pc_IF                      => pc_IF,
+      store_exception_pmp        => store_exception_pmp ,
+      load_exception_pmp         => load_exception_pmp ,
+      exception_pmp              => exception_pmp,
       harc_IF                    => harc_IF,
       irq_pending                => irq_pending,
       csr_instr_done             => csr_instr_done,
       csr_access_denied_o        => csr_access_denied_o,
       csr_rdata_o                => csr_rdata_o,
+      pc_IF                      => pc_IF,
       pc_ID                      => pc_ID,
       pc_IE                      => pc_IE,
+      if_except_data             => if_except_data,
       ie_except_data             => ie_except_data,
       ls_except_data             => ls_except_data,
       MHARTID                    => MHARTID,
@@ -787,10 +727,12 @@ begin
       misaligned_err             => misaligned_err,
       WFI_Instr                  => WFI_Instr,
       taken_branch               => taken_branch,
+      if_taken_branch            => if_taken_branch,
       ie_taken_branch            => ie_taken_branch,
       ls_taken_branch            => ls_taken_branch,
       set_branch_condition       => set_branch_condition,
       set_except_condition       => set_except_condition,
+      if_except_condition        => if_except_condition,
       ie_except_condition        => ie_except_condition,
       ls_except_condition        => ls_except_condition,
       set_mret_condition         => set_mret_condition,
@@ -819,11 +761,11 @@ begin
       clk_i                      => clk_i,
       rst_ni                     => rst_ni,
       instr_req_o                => instr_req_o,
-      instr_gnt_i                => instr_gnt_pmp,
+      instr_gnt_i                => instr_gnt_i,
       instr_rvalid_i             => instr_rvalid_i,
       instr_rdata_i              => instr_rdata_i,
       data_req_o                 => data_req_o_int,
-      data_gnt_i                 => data_gnt_pmp_internal,
+      data_gnt_i                 => data_gnt_i,
       data_rvalid_i              => data_rvalid_i,
       data_we_o                  => data_we_o_int,
       data_be_o                  => data_be_o,
@@ -852,46 +794,15 @@ begin
     )
     port map (
     -- Data Memory interfece 
-    -- 
-    data_we_pmp => data_we_pmp_internal,
-    data_we_o                    => data_we_o_int,
-
-    data_gnt_pmp             => data_gnt_pmp_internal,
-    data_gnt_effettivo       => data_gnt_i,
-
-    data_addr_pmp     => data_addr_pmp_internal,
-    data_addr_o              => data_addr_pipe_internal,
-        load_exception_pmp =>     load_exception_pmp ,
-                store_exception_pmp =>     store_exception_pmp ,
-  -- program memory interface
-    instr_addr_o                    =>  pc_IF,
-    instr_addr_pmp => instr_addr_pmp,
-    instr_pmpvalid_o => instr_pmpvalid_internal,
-    
-    instr_gnt_pmp => instr_gnt_pmp,
-    instr_gnt_effettivo => instr_gnt_i,
-
-    ie_except_data_pmp         => ie_except_data_pmp,
-    IE_except_condition_pmp      => IE_except_condition_pmp,
-    ie_taken_branch_pmp           =>  ie_taken_branch_pmp,
-    ie_except_data         => ie_except_data,
-    IE_except_condition      => IE_except_condition,
-    ie_taken_branch           =>  ie_taken_branch,
-
-    set_except_condition          => set_except_condition,
-    taken_branch                  => taken_branch,
-
-    set_except_condition_pmp          =>set_except_condition_pmp,
-    taken_branch_pmp                  =>    taken_branch_pmp,
-     exception_pmp => exception_pmp,
-
-
+    data_addr_o                  => data_addr_pipe_internal,
+    load_exception_pmp           => load_exception_pmp ,
+    store_exception_pmp          => store_exception_pmp ,
+     -- program memory interface
+    instr_addr_o                 => pc_IF,
+    exception_pmp                => exception_pmp,
     --PMP Registers Inputs
-    pmpcfg_in                           => pmpcfg_internal,
-    pmpaddr_in                    => pmpaddr_internal,
-    clk_i                                  => clk_i,
-    rst_ni                                        => rst_ni
-
+    pmpcfg_in                    => pmpcfg_internal,
+    pmpaddr_in                   => pmpaddr_internal
   );
 
 

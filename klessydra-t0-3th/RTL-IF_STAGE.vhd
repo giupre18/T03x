@@ -26,11 +26,14 @@ entity IF_STAGE is
     RF_CEIL                    : natural
     );
   port(
-    fetch_taken_branch            : out std_logic;
-    fetch_except_condition        : out std_logic;
-    fetch_except_data             : out std_logic_vector(31 downto 0);   
-    exception_pmp_fetch           : in  std_logic;
-    --exception_pmp_decode             : out std_logic;
+    load_exception_pmp         : in std_logic;
+    store_exception_pmp        : in std_logic;           
+    load_exception_pmp_fetch   : out std_logic;
+    store_exception_pmp_fetch  : out std_logic;
+    if_taken_branch            : out std_logic;
+    if_except_condition        : out std_logic;
+    if_except_data             : out std_logic_vector(31 downto 0);   
+    exception_pmp_fetch        : in  std_logic;
     pc_IF                      : in  std_logic_vector(31 downto 0);
     busy_ID                    : in  std_logic;
     instr_rvalid_i             : in  std_logic;
@@ -78,7 +81,6 @@ architecture FETCH of IF_STAGE is
   signal rs2_valid_ID_lat        : std_logic;
   signal rd_valid_ID_lat         : std_logic;
   signal rd_read_valid_ID_lat    : std_logic;
-  signal exception_pmp_busy : std_logic ;
 
   function rs1 (signal instr : in std_logic_vector(31 downto 0)) return integer is
   begin
@@ -113,18 +115,20 @@ begin
   process(clk_i, rst_ni)
   begin
     if rising_edge(clk_i) then
+    load_exception_pmp_fetch  <= load_exception_pmp;
+    store_exception_pmp_fetch <= store_exception_pmp;
     if exception_pmp_fetch = '1' then
-     fetch_except_data <= INSTR_ACCESS_FAULT_CODE;
+     if_except_data <= INSTR_ACCESS_FAULT_CODE;
     end if;
    
     
-      if instr_gnt_i = '1'  and exception_pmp_fetch = '0' then
+    if instr_gnt_i = '1'  and exception_pmp_fetch = '0' then
         pc_ID   <= pc_IF;
         harc_ID <= harc_IF;
-      end if;
-      if instr_rvalid_i = '1'  then 
+    end if;
+    if instr_rvalid_i = '1'  then 
         instr_word_ID_lat <= instr_rdata_i;
-      end if;
+    end if;
     end if;
   end process;
 
@@ -132,18 +136,18 @@ begin
   instr_rvalid_ID <= instr_rvalid_i;
   instr_word_ID   <= instr_rdata_i when instr_rvalid_i = '1'  else instr_word_ID_lat;
   process(exception_pmp_fetch)
-  variable fetch_except_condition_wires        : std_logic;
-  variable fetch_taken_branch_wires            : std_logic;
+  variable if_except_condition_wires        : std_logic;
+  variable if_taken_branch_wires            : std_logic;
 
   begin 
-       fetch_except_condition_wires := '0';
-       fetch_taken_branch_wires  := '0';
+       if_except_condition_wires := '0';
+       if_taken_branch_wires  := '0';
     if exception_pmp_fetch = '1' then  -- ILLEGAL_INSTRUCTION
-        fetch_except_condition_wires := '1';
-        fetch_taken_branch_wires  := '1';
+        if_except_condition_wires := '1';
+        if_taken_branch_wires  := '1';
     end if;
-        fetch_taken_branch            <= fetch_taken_branch_wires;
-        fetch_except_condition        <= fetch_except_condition_wires;
+        if_taken_branch            <= if_taken_branch_wires;
+        if_except_condition        <= if_except_condition_wires;
 
 end process;
 --------------------------------------------------------------------- end of IF stage -------------
