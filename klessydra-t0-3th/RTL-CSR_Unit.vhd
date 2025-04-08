@@ -143,6 +143,7 @@ architecture CSR of CSR_Unit is
   signal csr_instr_done_replicated      : std_logic_vector(harc_range);
   signal csr_access_denied_o_replicated : std_logic_vector(harc_range);
   signal csr_rdata_o_replicated         : harc_vec_array;
+  signal csr_rdata_o_replicated_pmp         : std_logic_vector(31 downto 0);
 
   -- wire only signals (For Synopsis Comaptibility)
   signal MSTATUS_internal       : MSTATUS_array;
@@ -161,7 +162,7 @@ architecture CSR of CSR_Unit is
   signal served_mret_condition_lat       : std_logic_vector(harc_range);
 
   signal sw_irq_int                      : std_logic_vector(harc_range);
-
+signal  pmpread : std_logic;
   -- internal signals (VHD1993)
   signal PCER_int                        : harc_vec_array;
   signal MHARTID_int                     : MHARTID_array;
@@ -229,6 +230,173 @@ begin
   MSCRATCH      <= MSCRATCH_internal;
   irq_ack_o     <= irq_ack_o_internal;
 
+pmp_controller : process(clk_i, rst_ni)
+    variable pmpcfg_internal : pmpcfg_array;
+    variable pmpaddr_internal : pmpaddr_array;
+  ---variable pmpcfg_in_field : std_logic_vector(7 downto 0);
+
+procedure process_pmpcfg(i : integer) is
+begin
+  case csr_op_i is
+    when CSRRW | CSRRWI =>
+      
+ if pmpcfg_internal(i)(7) = '0' then
+          pmpcfg_internal(i)(7 downto 0) := csr_wdata_i(7 downto 0);
+        end if;
+      if pmpcfg_internal(i)(15) = '0' then
+          pmpcfg_internal(i)(15 downto 8) := csr_wdata_i(15 downto 8);
+        end if;
+      if pmpcfg_internal(i)(23) = '0' then
+          pmpcfg_internal(i)(23 downto 16) := csr_wdata_i(23 downto 16);
+        end if;
+        if pmpcfg_internal(i)(31) = '0' then
+          pmpcfg_internal(i)(31 downto 24) := csr_wdata_i(31 downto 24);
+        end if;
+    when CSRRS | CSRRSI | CSRRC | CSRRCI=>
+      pmpread <= '1';
+      csr_rdata_o_replicated_pmp <= pmpcfg_internal(i);
+       if rs1(instr_word_IE) /= 0 then
+        pmpcfg(i) <= pmpcfg_internal(i);
+       end if;
+
+    when others =>
+      null;
+  end case;
+end procedure;
+
+procedure process_pmpaddr(i : integer) is
+  variable pmpcfg_in_field : std_logic_vector(7 downto 0);
+begin
+  pmpcfg_in_field := extract_pmpcfg_in_field(pmpcfg_internal, i);
+
+
+   case csr_op_i is
+    when CSRRW | CSRRWI =>
+      if pmpcfg_in_field(7) = '0' then
+        pmpaddr_internal(i) := csr_wdata_i(31 downto 0);
+      end if;
+
+    when CSRRS | CSRRSI  =>
+      pmpread <= '1';
+      csr_rdata_o_replicated_pmp <= pmpaddr_internal(i);
+    if rs1(instr_word_IE) /= 0 then
+       pmpaddr(i) <= pmpaddr_internal(i);
+    end if;
+    when  CSRRC | CSRRCI=>
+      pmpread <= '1';
+      csr_rdata_o_replicated_pmp <= pmpaddr_internal(i);
+    if rs1(instr_word_IE) /= 0 then
+       pmpaddr(i) <= pmpaddr_internal(i);
+    end if;
+    when others =>
+      null;
+  end case;
+end procedure;
+
+begin
+  if rst_ni = '0' then
+    pmpaddr_internal(0 to pmpaddr_internal'length-1) := (others => (others => '0'));
+    pmpcfg_internal(0 to pmpcfg_internal'length-1) := (others => (others => '0'));
+    pmpread    <= '0';
+  elsif rising_edge(clk_i) then
+  pmpread <= '0';
+          pmpcfg  <= pmpcfg_internal; 
+        pmpaddr <= pmpaddr_internal;
+
+case csr_addr_i is
+  when x"3A0" => process_pmpcfg(0);
+  when x"3A1" => process_pmpcfg(1);
+  when x"3A2" => process_pmpcfg(2);
+  when x"3A3" => process_pmpcfg(3);
+  when x"3A4" => process_pmpcfg(4);
+  when x"3A5" => process_pmpcfg(5);
+  when x"3A6" => process_pmpcfg(6);
+  when x"3A7" => process_pmpcfg(7);
+  when x"3A8" => process_pmpcfg(8);
+  when x"3A9" => process_pmpcfg(9);
+  when x"3AA" => process_pmpcfg(10);
+  when x"3AB" => process_pmpcfg(11);
+  when x"3AC" => process_pmpcfg(12);
+  when x"3AD" => process_pmpcfg(13);
+  when x"3AE" => process_pmpcfg(14);
+  when x"3AF" => process_pmpcfg(15);
+  when x"3B0" => process_pmpaddr(0);
+  when x"3B1" => process_pmpaddr(1);
+  when x"3B2" => process_pmpaddr(2);
+  when x"3B3" => process_pmpaddr(3);
+  when x"3B4" => process_pmpaddr(4);
+  when x"3B5" => process_pmpaddr(5);
+  when x"3B6" => process_pmpaddr(6);
+  when x"3B7" => process_pmpaddr(7);
+  when x"3B8" => process_pmpaddr(8);
+  when x"3B9" => process_pmpaddr(9);
+  when x"3BA" => process_pmpaddr(10);
+  when x"3BB" => process_pmpaddr(11);
+  when x"3BC" => process_pmpaddr(12);
+  when x"3BD" => process_pmpaddr(13);
+  when x"3BE" => process_pmpaddr(14);
+  when x"3BF" => process_pmpaddr(15);
+  
+  when x"3C0" => process_pmpaddr(16);
+  when x"3C1" => process_pmpaddr(17);
+  when x"3C2" => process_pmpaddr(18);
+  when x"3C3" => process_pmpaddr(19);
+  when x"3C4" => process_pmpaddr(20);
+  when x"3C5" => process_pmpaddr(21);
+  when x"3C6" => process_pmpaddr(22);
+  when x"3C7" => process_pmpaddr(23);
+  when x"3C8" => process_pmpaddr(24);
+  when x"3C9" => process_pmpaddr(25);
+  when x"3CA" => process_pmpaddr(26);
+  when x"3CB" => process_pmpaddr(27);
+  when x"3CC" => process_pmpaddr(28);
+  when x"3CD" => process_pmpaddr(29);
+  when x"3CE" => process_pmpaddr(30);
+  when x"3CF" => process_pmpaddr(31);
+  
+  when x"3D0" => process_pmpaddr(32);
+  when x"3D1" => process_pmpaddr(33);
+  when x"3D2" => process_pmpaddr(34);
+  when x"3D3" => process_pmpaddr(35);
+  when x"3D4" => process_pmpaddr(36);
+  when x"3D5" => process_pmpaddr(37);
+  when x"3D6" => process_pmpaddr(38);
+  when x"3D7" => process_pmpaddr(39);
+  when x"3D8" => process_pmpaddr(40);
+  when x"3D9" => process_pmpaddr(41);
+  when x"3DA" => process_pmpaddr(42);
+  when x"3DB" => process_pmpaddr(43);
+  when x"3DC" => process_pmpaddr(44);
+  when x"3DD" => process_pmpaddr(45);
+  when x"3DE" => process_pmpaddr(46);
+  when x"3DF" => process_pmpaddr(47);
+  
+  when x"3E0" => process_pmpaddr(48);
+  when x"3E1" => process_pmpaddr(49);
+  when x"3E2" => process_pmpaddr(50);
+  when x"3E3" => process_pmpaddr(51);
+  when x"3E4" => process_pmpaddr(52);
+  when x"3E5" => process_pmpaddr(53);
+  when x"3E6" => process_pmpaddr(54);
+  when x"3E7" => process_pmpaddr(55);
+  when x"3E8" => process_pmpaddr(56);
+  when x"3E9" => process_pmpaddr(57);
+  when x"3EA" => process_pmpaddr(58);
+  when x"3EB" => process_pmpaddr(59);
+  when x"3EC" => process_pmpaddr(60);
+  when x"3ED" => process_pmpaddr(61);
+  when x"3EE" => process_pmpaddr(62);
+  when x"3EF" => process_pmpaddr(63);
+
+
+  when others => null;
+end case;
+end if;
+
+
+end process pmp_controller;
+
+
   -- here we start replicating the logic ------------------------------------------------------
   CSR_updating_logic : for h in harc_range generate
 
@@ -246,14 +414,10 @@ begin
 
     CSR_unit_op : process(clk_i, rst_ni)  -- single cycle unit, one process, fully synchronous 
 
-    variable pmpcfg_in_field : std_logic_vector(7 downto 0) ;
-    variable pmpcfg_internal : pmpcfg_array;
-    variable pmpaddr_internal : pmpaddr_array;
 
     begin
      
       if rst_ni = '0' then
-        --
         MSTATUS_internal(h)                 <= "01";
         MESTATUS(h)                         <= MESTATUS_RESET_VALUE;
         MEPC_internal(h)                    <= MEPC_RESET_VALUE;
@@ -296,19 +460,9 @@ begin
         csr_access_denied_o_replicated(h)   <= '0';
         csr_rdata_o_replicated(h)           <= (others => '0');
 
-        pmpaddr_internal(0)       := x"00040000";
-        pmpaddr_internal(1)       := x"00040800";
-        pmpaddr_internal(2)       := x"20000000";
-        pmpaddr_internal(3)       := x"23FFFFFF";
-        
-        pmpaddr_internal(4 to pmpaddr_internal'length-1) := (others => (others => '0'));
 
-        pmpcfg_internal(0)        := x"8F8F8B8F";
-        pmpcfg_internal(1 to pmpcfg_internal'length-1) := (others => (others => '0'));
    
       elsif rising_edge(clk_i) then
-        pmpcfg <= pmpcfg_internal; ---------------------------------------------------------------------aggiungo io
-        pmpaddr <= pmpaddr_internal; ---------------------------------------------------------------------aggiungo io
 
         MHARTID_int(h) <= std_logic_vector(resize(unsigned(core_id_i) * (THREAD_POOL_SIZE_GLOBAL- THREAD_POOL_SIZE)  + to_unsigned(h, THREAD_ID_SIZE), 10));
         -- CSR updating for all possible sources follows.
@@ -415,7 +569,7 @@ begin
           MESTATUS(h)(2 downto 1)        <= MSTATUS_internal(h);
           if served_if_except_condition_lat(h) = '1' then
           MEPC_internal(h)   <= pc_IF;
-          elsif served_ls_except_condition_lat(h) = '1' and (load_exception_pmp = '1' or store_exception_pmp ='1') then
+          elsif served_ls_except_condition_lat(h) = '1' then --and (load_exception_pmp = '1' or store_exception_pmp ='1') then
           MEPC_internal(h)   <= data_addr_internal;
           else
           MEPC_internal(h)   <= pc_except_value_wire(h);
@@ -448,49 +602,6 @@ begin
 
           if (csr_op_i /= "000" and csr_op_i /= "100") then  -- check for valid operation 
             
-             
-             --- pmp implementation
-       for i in pmpaddrconst'range loop
-        if csr_addr_i = pmpaddrconst(i) then
-           pmpcfg_in_field  := extract_pmpcfg_in_field(pmpcfg_internal, i );
-           if pmpcfg_in_field(7) = '0' then
-              case csr_op_i is
-                   when CSRRW | CSRRWI =>
-                        pmpaddr_internal(i) := csr_wdata_i(31 downto 0);
-                    when CSRRS | CSRRSI =>
-                         if rs1(instr_word_IE) /= 0 then
-                            pmpaddr(i) <= pmpaddr_internal(i);
-                         end if;
-                    when others =>
-                         null;
-                    end case; 
-              exit; -- Una volta trovato, usciamo dal loop
-           end if;
-        end if;
-       end loop;
-  
-       for i in pmpcfgconstant'range loop
-        if csr_addr_i = pmpcfgconstant(i) then
-           case csr_op_i is
-                when CSRRW | CSRRWI =>
-        -- Ciclo per verificare e aggiornare ogni segmento di 8 bit
-                     for j in 0 to 3 loop
-                        if pmpcfg_internal(i)((j+1)*8 - 1) = '0' then
-                           pmpcfg_internal(i)(j*8+7 downto j*8) := csr_wdata_i(j*8+7 downto j*8);
-                        end if;
-                      end loop;
-                when CSRRS | CSRRSI =>
-                        if rs1(instr_word_IE) /= 0 then
-                           pmpcfg(i) <= pmpcfg_internal(i);
-                        end if;
-                when others =>
-                     null;
-                end case;
-           exit; -- Esce dal loop se è stata trovata una corrispondenza
-        end if; 
-       end loop;
-
-
 
        case csr_addr_i is    
               when MSTATUS_addr =>
@@ -1145,7 +1256,6 @@ begin
 
               when others =>  -- invalid CSR address. ignored. May raise exception in future.
                 csr_rdata_o_replicated(h) <= (others => '0');  -- unhandled situation
-                                                               -- default value
             end case;
           else
             null;  -- invalid CSR operation, ignored. May raise exception in future.
@@ -1275,6 +1385,8 @@ begin
   end generate CSR_updating_logic;
   -- end of replicated logic ------------------------------------------------------------
 
+
+
 --here we OR the signals coming from different CS logic replicas
   process(csr_instr_done_replicated, csr_access_denied_o_replicated) --VHDL1993
     variable wire1, wire2 : std_logic;
@@ -1289,7 +1401,7 @@ begin
   end process;
 
 -- this is a mux choosing the csr data output corresponding to the actual harc executed
-  csr_rdata_o <= csr_rdata_o_replicated(harc_EXEC);
+csr_rdata_o <= csr_rdata_o_replicated_pmp when pmpread = '1' else csr_rdata_o_replicated(harc_EXEC);
 
 
 -- small fsm using the served_irq signals coming from different PC updating logic replicas

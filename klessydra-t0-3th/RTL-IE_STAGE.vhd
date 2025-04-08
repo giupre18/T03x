@@ -807,7 +807,7 @@ begin
                decoded_instruction_IE(REMU_bit_position) = '1' then
               case state_div is
                 when init =>
-                  if RS1_Data_IE(31) = '0' or signed_op = '0' then
+                                     if RS1_Data_IE(31) = '0' or signed_op = '0' then
                    res_wire <= (63 downto 32 => RS1_Data_IE, 31 downto 0 => '0');
 
                   else

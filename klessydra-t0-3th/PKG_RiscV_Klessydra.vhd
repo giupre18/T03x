@@ -398,36 +398,7 @@ package riscv_klessydra is
   constant MVTYPE_RESET_VALUE   : std_logic_vector(3 downto 0)           := "1000";
   constant MPSCLFAC_RESET_VALUE : std_logic_vector(4 downto 0)           := (others => '0');							  
   -- constant pmp configuration
- type constantpmpcfg_array is array (0 to 15) of std_logic_vector(11 downto 0);
-  constant pmpcfgconstant: constantpmpcfg_array := (
-    0  => x"3A0",  1  => x"3A1",  2  => x"3A2",  3  => x"3A3",
-    4  => x"3A4",  5  => x"3A5",  6  => x"3A6",  7  => x"3A7",
-    8  => x"3A8",  9  => x"3A9",  10 => x"3AA",  11 => x"3AB",
-    12 => x"3AC",  13 => x"3AD",  14 => x"3AE",  15 => x"3AF"
-   );
-   
-
-  -- constant pmp address
-  type constatpmpaddr_array is array (0 to 63) of std_logic_vector(11 downto 0);
-  constant pmpaddrconst: constatpmpaddr_array := (
-    0  => x"3B0",  1  => x"3B1",  2  => x"3B2",  3  => x"3B3",
-    4  => x"3B4",  5  => x"3B5",  6  => x"3B6",  7  => x"3B7",
-    8  => x"3B8",  9  => x"3B9",  10 => x"3BA",  11 => x"3BB",
-    12 => x"3BC",  13 => x"3BD",  14 => x"3BE",  15 => x"3BF",
-    16 => x"3C0",  17 => x"3C1",  18 => x"3C2",  19 => x"3C3",
-    20 => x"3C4",  21 => x"3C5",  22 => x"3C6",  23 => x"3C7",
-    24 => x"3C8",  25 => x"3C9",  26 => x"3CA",  27 => x"3CB",
-    28 => x"3CC",  29 => x"3CD",  30 => x"3CE",  31 => x"3CF",
-    32 => x"3D0",  33 => x"3D1",  34 => x"3D2",  35 => x"3D3",
-    36 => x"3D4",  37 => x"3D5",  38 => x"3D6",  39 => x"3D7",
-    40 => x"3D8",  41 => x"3D9",  42 => x"3DA",  43 => x"3DB",
-    44 => x"3DC",  45 => x"3DD",  46 => x"3DE",  47 => x"3DF",
-    48 => x"3E0",  49 => x"3E1",  50 => x"3E2",  51 => x"3E3",
-    52 => x"3E4",  53 => x"3E5",  54 => x"3E6",  55 => x"3E7",
-    56 => x"3E8",  57 => x"3E9",  58 => x"3EA",  59 => x"3EB",
-    60 => x"3EC",  61 => x"3ED",  62 => x"3EE",  63 => x"3EF"
-   );
-
+ 
 
   -- csr bits for instructions SYSTEM -> CSRRS
   --constant RDCYCLE    : std_logic_vector(11 downto 0) := "110000000000";
