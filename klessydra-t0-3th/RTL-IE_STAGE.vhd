@@ -795,10 +795,19 @@ begin
                                                 * unsigned(RS2_Data_IE(15 downto 0)));
               partial_mul_d_wire <= std_logic_vector( unsigned(RS1_Data_IE(15 downto 0))   
                                                 * unsigned(RS2_Data_IE(15 downto 0)));
-              MUL_low <= std_logic_vector((unsigned(partial_mul_d_wire(31 downto 16)) +
-                                           unsigned(partial_mul_b_wire(15 downto 0))  +
-                                           unsigned(partial_mul_c_wire(15 downto 0))) &
-                                           unsigned(partial_mul_d_wire(15 downto 0)));
+MUL_low <= std_logic_vector(
+              ieee.numeric_std."&"(
+                ieee.numeric_std."+"(
+                  ieee.numeric_std."+"(
+                    unsigned(partial_mul_d_wire(31 downto 16)),
+                    unsigned(partial_mul_b_wire(15 downto 0))
+                  ),
+                  unsigned(partial_mul_c_wire(15 downto 0))
+                ),
+                unsigned(partial_mul_d_wire(15 downto 0))
+              )
+            );
+
             end if;
 
             if decoded_instruction_IE(DIV_bit_position)  = '1' or 

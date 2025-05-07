@@ -21,6 +21,7 @@ use ieee.std_logic_1164.all;
 use ieee.std_logic_misc.all;
 use ieee.numeric_std.all;
 use std.textio.all;
+use ieee.math_real.all;
 
 -- local packages ------------
 use work.riscv_klessydra.all;
@@ -93,8 +94,10 @@ entity CSR_Unit is
     irq_ack_o                   : out std_logic;
     sw_irq                      : in  std_logic_vector(THREAD_POOL_SIZE_GLOBAL-1 downto 0);
     sw_irq_pending              : in  std_logic_vector(THREAD_POOL_SIZE_GLOBAL-1 downto 0);
-    pmpaddr                     : out pmpaddr_array ;  ---------------------------------------------------------------------aggiungo io
-    pmpcfg                      : out pmpcfg_array   ---------------------------------------------------------------------aggiungo io
+    addr_start                  : out addr_unsigend ;
+    addr_end                    : out addr_unsigend ;
+    pmpaddr                     : out pmpaddr_array ;  
+    pmpcfg                      : out pmpcfg_array  
     );
 end entity;
 
@@ -181,7 +184,7 @@ signal  pmpread : std_logic;
   begin
     return to_integer(unsigned(instr(7+(RF_CEIL-1) downto 7)));
   end;
-
+  type pmp_match_type is (OFF,TOR, NA4, NAPOT);
 
   function extract_pmpcfg_in_field(
         pmpcfg_in : pmpcfg_array; 
@@ -210,6 +213,42 @@ signal  pmpread : std_logic;
   end function;
 
 
+function get_match_type(pmpcfg_in_field  : std_logic_vector(7 downto 0)) return pmp_match_type is
+  begin
+    if pmpcfg_in_field (4) = '1' and pmpcfg_in_field (3) = '1' then
+      return NAPOT;
+    elsif pmpcfg_in_field (4) = '1' and pmpcfg_in_field (3) = '0' then
+      return NA4;
+    elsif pmpcfg_in_field (4) = '0' and pmpcfg_in_field (3) = '1' then
+      return TOR;
+     else 
+      return OFF;
+    end if;
+  end function;
+
+
+ function check_permissions(pmpcfg_in_field  : std_logic_vector(7 downto 0); access_type : std_logic_vector(1 downto 0)) return std_logic is
+  begin
+    -- cfg(2): X (Execute)
+    -- cfg(1): W (Write)
+    -- cfg(0): R (Read)
+    case access_type is
+      when "10" => -- Fetch
+        return pmpcfg_in_field (2); -- Bit X
+      when "00" => -- Load
+        return pmpcfg_in_field (0); -- Bit R
+     when "01" => -- Store 
+        return pmpcfg_in_field (1); -- Bit W
+      when others =>
+        return '0';
+    end case;
+  end function;
+
+type logic_array_64 is array (63 downto 0) of std_logic;
+signal pmpaddr_initialized : logic_array_64 := (others => '0');
+
+
+ 
 begin
 
 
@@ -231,16 +270,21 @@ begin
   irq_ack_o     <= irq_ack_o_internal;
 
 pmp_controller : process(clk_i, rst_ni)
-    variable pmpcfg_internal : pmpcfg_array;
-    variable pmpaddr_internal : pmpaddr_array;
-  ---variable pmpcfg_in_field : std_logic_vector(7 downto 0);
-
+    variable pmpcfg_internal     : pmpcfg_array;
+    variable pmpaddr_internal    : pmpaddr_array;
+    variable addr_start_internal : addr_unsigend;
+    variable addr_end_internal   : addr_unsigend;
+    variable match_type          : pmp_match_type;
+    variable diff_napot_mask     : std_logic_vector(31 downto 0);
+    variable napot_mask          : std_logic_vector(31 downto 0);
+    variable nand_result         : unsigned(31 downto 0);
+   
 procedure process_pmpcfg(i : integer) is
 begin
   case csr_op_i is
     when CSRRW | CSRRWI =>
       
- if pmpcfg_internal(i)(7) = '0' then
+  if pmpcfg_internal(i)(7) = '0' then
           pmpcfg_internal(i)(7 downto 0) := csr_wdata_i(7 downto 0);
         end if;
       if pmpcfg_internal(i)(15) = '0' then
@@ -262,19 +306,59 @@ begin
     when others =>
       null;
   end case;
+
 end procedure;
 
 procedure process_pmpaddr(i : integer) is
   variable pmpcfg_in_field : std_logic_vector(7 downto 0);
+
 begin
+
   pmpcfg_in_field := extract_pmpcfg_in_field(pmpcfg_internal, i);
 
 
    case csr_op_i is
     when CSRRW | CSRRWI =>
-      if pmpcfg_in_field(7) = '0' then
+    if pmpcfg_in_field(7) = '0' or pmpaddr_initialized(i) = '0'  or rst_ni = '0' then 
         pmpaddr_internal(i) := csr_wdata_i(31 downto 0);
-      end if;
+        pmpaddr_initialized(i) <= '1';
+              end if;
+
+        match_type := get_match_type(pmpcfg_in_field );
+        case match_type is 
+
+      when TOR =>
+          if i = 0 then
+            addr_start_internal(i) := (others => '0'); 
+          else
+            addr_start_internal(i) :=unsigned(pmpaddr_internal(i-1)) sll 2; 
+          end if;
+         addr_end_internal(i) := unsigned(pmpaddr_internal(i)) sll 2; 
+
+
+
+
+
+     when NAPOT =>
+        -- Per NAPOT, l'indirizzo pmpaddr_internal è centrato sulla regione
+        napot_mask := ((pmpaddr_internal(i)) xor std_logic_vector(unsigned(pmpaddr_internal(i)) + 1)); ------- con questa parte "prendiamo" tutti i bit finali messi a 1
+        diff_napot_mask := std_logic_vector((unsigned(napot_mask) +1)sll 2); ------- con questo calcoliamo l'intervallo e con otto aggiungiamo gli 2^3 che richieno ( segna la differenza giusta) 
+        nand_result := unsigned(std_logic_vector(unsigned(pmpaddr_internal(i)) and unsigned(napot_mask)));
+        addr_start_internal(i) := unsigned(pmpaddr_internal(i) xor std_logic_vector(nand_result)) sll 2;
+        addr_end_internal(i) := addr_start_internal(i) + unsigned(diff_napot_mask);
+   
+
+
+
+
+
+      when NA4 =>
+        addr_start_internal(i) := unsigned(pmpaddr_internal(i)) sll 2 ;
+        addr_end_internal(i) := addr_start_internal(i) + 4;
+      when others =>
+      null;
+      end case;
+
 
     when CSRRS | CSRRSI  =>
       pmpread <= '1';
@@ -291,18 +375,25 @@ begin
     when others =>
       null;
   end case;
+  
+
+
+
 end procedure;
+
 
 begin
   if rst_ni = '0' then
     pmpaddr_internal(0 to pmpaddr_internal'length-1) := (others => (others => '0'));
     pmpcfg_internal(0 to pmpcfg_internal'length-1) := (others => (others => '0'));
     pmpread    <= '0';
-  elsif rising_edge(clk_i) then
-  pmpread <= '0';
-          pmpcfg  <= pmpcfg_internal; 
-        pmpaddr <= pmpaddr_internal;
 
+  elsif rising_edge(clk_i) then
+    pmpread <= '0';
+    pmpcfg  <= pmpcfg_internal; 
+    pmpaddr <= pmpaddr_internal;
+    addr_start<= addr_start_internal;
+    addr_end <= addr_end_internal;
 case csr_addr_i is
   when x"3A0" => process_pmpcfg(0);
   when x"3A1" => process_pmpcfg(1);
@@ -320,6 +411,8 @@ case csr_addr_i is
   when x"3AD" => process_pmpcfg(13);
   when x"3AE" => process_pmpcfg(14);
   when x"3AF" => process_pmpcfg(15);
+
+
   when x"3B0" => process_pmpaddr(0);
   when x"3B1" => process_pmpaddr(1);
   when x"3B2" => process_pmpaddr(2);
@@ -388,9 +481,14 @@ case csr_addr_i is
   when x"3EE" => process_pmpaddr(62);
   when x"3EF" => process_pmpaddr(63);
 
-
   when others => null;
+
 end case;
+
+
+
+
+
 end if;
 
 

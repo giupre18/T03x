@@ -69,6 +69,7 @@ package riscv_klessydra is
   -- Applicaiton specific types (VHDL1993) (they are not marked in the design files)
   type pmpaddr_array is array (0 to 63) of std_logic_vector(31 downto 0); ------------------------------------------------------------------- aggiungo io
   type pmpcfg_array is array (0 to 15) of std_logic_vector(31 downto 0); ------------------------------------------------------------------- aggiungo io
+  type addr_unsigend is array (0 to 63) of unsigned(31 downto 0);
 
   type harc_vec_array  is array (natural range THREAD_POOL_SIZE-1 downto 0) of std_logic_vector(31 downto 0);
   type MHARTID_array   is array (natural range THREAD_POOL_SIZE-1 downto 0) of std_logic_vector(9 downto 0);

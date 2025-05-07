@@ -126,7 +126,8 @@ end entity klessydra_t0_3th_core;
 architecture Klessydra_M of klessydra_t0_3th_core is
   signal pmpaddr_internal : pmpaddr_array;
   signal pmpcfg_internal : pmpcfg_array;
-
+  signal    addr_start_internal                 :  addr_unsigend ;
+  signal  addr_end_internal                   :  addr_unsigend ;
   constant THREAD_POOL_SIZE_GEN           : natural := work.riscv_klessydra.THREAD_POOL_SIZE;
   constant THREAD_POOL_SIZE_GLOBAL_GEN    : natural := work.riscv_klessydra.THREAD_POOL_SIZE_GLOBAL;
 
@@ -393,6 +394,8 @@ architecture Klessydra_M of klessydra_t0_3th_core is
     irq_ack_o                   : out std_logic;
     sw_irq                      : in  std_logic_vector(THREAD_POOL_SIZE_GLOBAL-1 downto 0);
     sw_irq_pending              : in  std_logic_vector(THREAD_POOL_SIZE_GLOBAL-1 downto 0);
+    addr_start                  : out addr_unsigend ;
+    addr_end                    : out addr_unsigend ;
     pmpaddr                     : out pmpaddr_array ;  ---------------------------------------------------------------------aggiungo io
     pmpcfg                      : out pmpcfg_array   ---------------------------------------------------------------------aggiungo io
     );
@@ -526,6 +529,8 @@ architecture Klessydra_M of klessydra_t0_3th_core is
     addr_start_debug           : out std_logic_vector(31 downto 0);
     addr_end_debug             : out std_logic_vector(31 downto 0);
     --PMP Registers Inputs
+    addr_start                 : in addr_unsigend ;
+    addr_end                   : in addr_unsigend ;
     pmpcfg_in                  : in  pmpcfg_array;
     pmpaddr_in                 : in  pmpaddr_array
   );
@@ -680,6 +685,8 @@ begin
       irq_ack_o                   => irq_ack_o,
       sw_irq                      => sw_irq,
       sw_irq_pending              => sw_irq_pending,
+      addr_start                  => addr_start_internal,
+      addr_end                    => addr_end_internal,
       pmpaddr                     => pmpaddr_internal,
       pmpcfg                      => pmpcfg_internal  
       );
@@ -801,6 +808,8 @@ begin
     instr_addr_o                 => pc_IF,
     exception_pmp                => exception_pmp,
     --PMP Registers Inputs
+    addr_start                   => addr_start_internal,
+    addr_end                     => addr_end_internal,
     pmpcfg_in                    => pmpcfg_internal,
     pmpaddr_in                   => pmpaddr_internal
   );
