@@ -245,8 +245,8 @@ begin
       halt_update_IE         <= (others => '0');
       halt_update_IE_pending <= (others => '0');
     elsif rising_edge(clk_i) then
-      load_exception_pmp_exc <= load_exception_pmp_decode;
-      store_exception_pmp_exc <= store_exception_pmp_decode;
+      --load_exception_pmp_exc <= load_exception_pmp_decode;
+      --store_exception_pmp_exc <= store_exception_pmp_decode;
       IE_WB_EN         <= '0';
       MUL_WB_EN        <= '0';
       WB_EN_next_IE    <= '0';

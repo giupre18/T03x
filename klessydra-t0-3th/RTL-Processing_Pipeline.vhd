@@ -810,8 +810,8 @@ begin
     THREAD_POOL_SIZE           => THREAD_POOL_SIZE
     )
   port map(
-    store_exception_pmp =>     store_exception_pmp_exc,
-    load_exception_pmp =>     load_exception_pmp_exc,
+    store_exception_pmp =>     store_exception_pmp_decode,
+    load_exception_pmp =>     load_exception_pmp_decode,
     clk_i                      => clk_i,
     rst_ni                     => rst_ni,    
     irq_pending                => irq_pending,
